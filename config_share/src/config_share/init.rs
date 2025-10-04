@@ -1,3 +1,4 @@
+use dialoguer::Confirm;
 use lazy_static::lazy_static;
 use std::path::PathBuf;
 use url::{ParseError, Url};
@@ -26,6 +27,7 @@ impl ConfigShare {
             "[init.initialize] force={}, skip_setup={}",
             force, skip_setup
         ));
+        
         self.create_config_file(force)?;
         if !skip_setup {
             self.populate_config()?;
@@ -41,6 +43,7 @@ impl ConfigShare {
             let input = dialoguer::Input::<String>::new()
                 .allow_empty(false)
                 .with_prompt("Enter the server that you want to sync your files to")
+                .with_initial_text("http://localhost:3000")
                 .clone()
                 .interact_text()
                 .unwrap();
@@ -50,6 +53,10 @@ impl ConfigShare {
             match Url::parse(&input) {
                 Ok(u) => {
                     server_url = u;
+                    dprint(format!(
+                        "[init.populate_config] Setting server_url={}",
+                        server_url
+                    ));
                     break;
                 }
                 Err(ParseError::RelativeUrlWithoutBase) => {
@@ -63,6 +70,25 @@ impl ConfigShare {
         }
         println!("Using server URL: {}", server_url);
         self.settings.server_url = Some(server_url);
+
+        let enable_worker = Confirm::new()
+            .with_prompt(
+                "Do you want to enable the worker to sync your files in the background? \
+            This will run the worker in the background when you log in.",
+            )
+            .default(false)
+            .interact()?;
+
+        // TODO: Set the worker service to run on user login
+        if enable_worker {
+            println!("Enabling worker");
+        }
+        self.settings.enable_worker = enable_worker;
+
+        dprint(format!(
+            "[init.populate_config] Setting enable_worker={}",
+            enable_worker
+        ));
 
         Ok(())
     }

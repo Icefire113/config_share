@@ -11,6 +11,8 @@ pub(crate) struct ShareSettings {
     pub(crate) tracked_files: Vec<TrackedFile>,
     pub(crate) last_sync: Option<DateTime<Utc>>,
     pub(crate) server_url: Option<Url>,
+    /// Whether or not to run the worker in the background when the user logs in
+    pub(crate) enable_worker: bool,
 }
 
 impl Default for ShareSettings {
@@ -19,6 +21,7 @@ impl Default for ShareSettings {
             tracked_files: Vec::new(),
             last_sync: None,
             server_url: None,
+            enable_worker: false,
         }
     }
 }

@@ -3,6 +3,7 @@ use std::{fs::File, io::Write};
 use crate::share_settings::ShareSettings;
 
 mod init;
+mod add_file;
 
 pub struct ConfigShare {
     settings: ShareSettings,
