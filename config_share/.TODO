@@ -1,0 +1,1 @@
+☐ Move console output to using `console`(https://docs.rs/console/latest/console/) rather than just `println!` (also maybe `dprint`)
