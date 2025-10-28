@@ -29,7 +29,8 @@ fn main() {
         }
         Some(("add", sub_matches)) => {
             dprint("[main.sub_command] add");
-            match app.add_file(sub_matches.get_one::<String>("file").unwrap().to_string()) {
+            // unwrap is safe here as the subcommand "add" has "file" as a required argument
+            match app.add_file(sub_matches.get_one::<String>("file").unwrap()) {
                 Ok(_) => {}
                 Err(e) => {
                     eprintln!("{}: {}", style("Err").red().bold(), e);
@@ -37,13 +38,14 @@ fn main() {
                 }
             }
         }
-        _ => unreachable!(),
+        _ => unreachable!("Did you forget to add a subcommand?"),
     }
 }
 
 fn cli() -> Command {
     command!()
         .about("Utility for syncing config files across multiple machines")
+        .arg_required_else_help(true)
         .subcommand(
             Command::new("init")
                 .arg(

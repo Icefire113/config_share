@@ -27,7 +27,7 @@ impl ConfigShare {
             "[init.initialize] force={}, skip_setup={}",
             force, skip_setup
         ));
-        
+
         self.create_config_file(force)?;
         if !skip_setup {
             self.populate_config()?;
@@ -60,11 +60,13 @@ impl ConfigShare {
                     break;
                 }
                 Err(ParseError::RelativeUrlWithoutBase) => {
+                    // TODO: Make this return Err properly
                     eprintln!("Err: Server URL must have a base (e.g. http:// or https://)")
                 }
                 Err(e) => {
+                    // TODO: Make this return Err properly
                     dprint(format!("[init.populate_config] e={}", e));
-                    println!("Err: {}", e)
+                    eprintln!("Err: {}", e)
                 }
             }
         }
