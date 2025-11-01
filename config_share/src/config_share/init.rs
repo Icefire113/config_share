@@ -4,10 +4,7 @@ use std::path::PathBuf;
 use url::{ParseError, Url};
 use util::dprint;
 
-use crate::{
-    config_share::ConfigShare,
-    share_settings::{self, ShareSettings},
-};
+use crate::{config_share::ConfigShare, share_settings::ShareSettings};
 
 lazy_static! {
     #[derive(Debug)]
