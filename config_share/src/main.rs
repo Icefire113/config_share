@@ -9,43 +9,56 @@ mod share_settings;
 mod tracked_file_info;
 
 fn main() {
-    let matches = cli().get_matches();
-
     let mut app = ConfigShare::default();
 
-    match matches.subcommand() {
-        Some(("init", sub_matches)) => {
-            dprint("[main.sub_command] init");
-            match app.initialize(
-                sub_matches.get_flag("overwrite"),
-                sub_matches.get_flag("no-setup"),
-            ) {
-                Ok(_) => {}
-                Err(e) => {
-                    eprintln!("{}: {}", style("Err").red().bold(), e);
-                    exit(1);
-                }
-            };
+    match run(&mut app) {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!("{}: {}", style("error").red().bold(), e);
+            exit(1);
         }
-        Some(("add", sub_matches)) => {
-            dprint("[main.sub_command] add");
-            // unwrap is safe here as the subcommand "add" has "file" as a required argument
-            match app.add_file(sub_matches.get_one::<String>("file").unwrap()) {
-                Ok(_) => {}
-                Err(e) => {
-                    eprintln!("{}: {}", style("Err").red().bold(), e);
-                    exit(1);
-                }
-            }
-        }
-        _ => unreachable!("Did you forget to add a subcommand?"),
     }
 }
 
+fn run(app: &mut ConfigShare) -> Result<(), Box<dyn std::error::Error>> {
+    let mut matches = cli();
+
+    match matches.get_matches_mut().subcommand() {
+        Some(("init", sub_matches)) => {
+            dprint("[main.sub_command] init");
+
+            app.initialize(
+                sub_matches.get_flag("overwrite"),
+                sub_matches.get_flag("no-setup"),
+            )?;
+        }
+        Some(("add", sub_matches)) => {
+            dprint("[main.sub_command] add");
+            app.check_initialized()?;
+            app.load_settings()?;
+
+            app.add_file(
+                // unwrap is safe here as the subcommand "add" has "file" as a required argument
+                sub_matches.get_one::<String>("file").unwrap(),
+                sub_matches.get_flag("ignore-permissions"),
+            )?;
+        }
+        None => {
+            // this is still an error, but we should also check if the user has
+            // initialized the config aswell as show the usage/ help options
+            matches.print_long_help()?;
+            app.check_initialized()?;
+            // return Err("".into());
+        }
+        _ => unreachable!("Did you forget to add a subcommand?"),
+    };
+    Ok(())
+}
+
 fn cli() -> Command {
-    command!()
+    let mut c = command!()
         .about("Utility for syncing config files across multiple machines")
-        .arg_required_else_help(true)
+        // .arg_required_else_help(true)
         .subcommand(
             Command::new("init")
                 .arg(
@@ -69,6 +82,15 @@ fn cli() -> Command {
                     .help("The file to add to the list of files that will be synced")
                     .required(true)
             )
+            .arg(
+                Arg::new("ignore-permissions")
+                .long("ignore-permissions")
+                .action(ArgAction::SetTrue)
+                .help("Skips syncing file permissions for this file")
+            )
             .about("Adds a file to the list of files that will be synced")
-        )
+        );
+    c.build();
+
+    c
 }

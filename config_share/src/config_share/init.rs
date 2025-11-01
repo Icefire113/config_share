@@ -4,7 +4,10 @@ use std::path::PathBuf;
 use url::{ParseError, Url};
 use util::dprint;
 
-use crate::{config_share::ConfigShare, share_settings};
+use crate::{
+    config_share::ConfigShare,
+    share_settings::{self, ShareSettings},
+};
 
 lazy_static! {
     #[derive(Debug)]
@@ -92,6 +95,7 @@ impl ConfigShare {
             enable_worker
         ));
 
+        self.save_settings()?;
         Ok(())
     }
 
@@ -107,7 +111,7 @@ impl ConfigShare {
             ));
         }
 
-        self.settings = share_settings::ShareSettings::default();
+        self.settings = ShareSettings::default();
 
         self.save_settings()?;
         Ok(())
