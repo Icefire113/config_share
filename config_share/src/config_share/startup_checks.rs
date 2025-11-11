@@ -1,0 +1,51 @@
+use anyhow::{Context, anyhow};
+use chrono::{TimeDelta, Utc};
+use console::style;
+use util::dprint;
+
+use crate::config_share::{ConfigShare, init};
+
+impl ConfigShare {
+    pub fn all_startup_checks(&self) -> anyhow::Result<()> {
+        // self.check_last_manual_sync()?;
+        self.check_machine_id_blank()?;
+        Ok(())
+    }
+
+    pub fn check_last_manual_sync(&self) -> anyhow::Result<()> {
+        dprint("[startup_checks.check_last_manual_sync] Checking last manual sync.");
+
+        if self.settings.last_sync.is_none() {
+            todo!("Run a manual sync with the server")
+        }
+
+        if self.settings.last_sync.unwrap()
+            < Utc::now()
+            .checked_sub_signed(TimeDelta::hours(self.settings.manual_sync_reminder_time))
+            .with_context(|| 
+                format!("[startup_checks.check_last_manual_sync] Failed to subtract {} hours from the current date", self.settings.manual_sync_reminder_time))?
+        {
+            todo!("Run a manual sync with the server")
+        }
+
+        Ok(())
+    }
+
+    pub fn check_machine_id_blank(&self) -> anyhow::Result<()> {
+        dprint("[startup_checks.check_machine_id] Checking machine id.");
+        if self.settings.machine_id.trim().is_empty() {
+            println!("{}: The machine id in the config file is currently blank, please change it to something unique", style("warning").yellow().bold());
+            return Ok(());
+        }
+        Ok(())
+    }
+
+    pub fn check_initialized(&self) -> anyhow::Result<()> {
+        if !init::CONFIG_FILE_PATH.try_exists()? {
+            return Err(anyhow!(
+                "Config file does not exist, please use `config_share init` to set one up"
+            ));
+        }
+        Ok(())
+    }
+}

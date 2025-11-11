@@ -2,17 +2,19 @@ use crate::config_share::ConfigShare;
 use clap::{Arg, ArgAction, Command, command};
 use console::style;
 use std::process::exit;
+use std::result::Result::Ok;
 use util::dprint;
 
 mod config_share;
+mod file_differentation_method;
 mod share_settings;
 mod tracked_file_info;
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let mut app = ConfigShare::default();
 
     match run(&mut app) {
-        Ok(_) => {}
+        Ok(_) => anyhow::Ok(()),
         Err(e) => {
             eprintln!("{}: {}", style("error").red().bold(), e);
             exit(1);
@@ -20,7 +22,7 @@ fn main() {
     }
 }
 
-fn run(app: &mut ConfigShare) -> Result<(), Box<dyn std::error::Error>> {
+fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
     let mut matches = cli();
 
     match matches.get_matches_mut().subcommand() {
@@ -35,12 +37,14 @@ fn run(app: &mut ConfigShare) -> Result<(), Box<dyn std::error::Error>> {
         Some(("add", sub_matches)) => {
             dprint("[main.sub_command] add");
             app.check_initialized()?;
+            app.all_startup_checks()?;
             app.load_settings()?;
 
             app.add_file(
                 // unwrap is safe here as the subcommand "add" has "file" as a required argument
                 sub_matches.get_one::<String>("file").unwrap(),
                 sub_matches.get_flag("ignore-permissions"),
+                sub_matches.get_flag("ask-method"),
             )?;
         }
         None => {
@@ -87,6 +91,11 @@ fn cli() -> Command {
                 .long("ignore-permissions")
                 .action(ArgAction::SetTrue)
                 .help("Skips syncing file permissions for this file")
+            )
+            .arg(Arg::new("ask-method")
+                .long("ask-method")
+                .action(ArgAction::SetTrue)
+                .help("Prompts the user to select a method to name files (default is the local file name)")
             )
             .about("Adds a file to the list of files that will be synced")
         );

@@ -1,3 +1,3 @@
 [workspace]
 resolver = "3"
-members = ["cfg_share_worker", "config_share", "util"]
+members = ["cfg_share_worker", "config_share", "sync_server", "util"]

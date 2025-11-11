@@ -1,2 +1,5 @@
 ☐ Move console output to using `console`(https://docs.rs/console/latest/console/) rather than just `println!` (also maybe `dprint`)
 ✔ Check if the config file is present on startup, else error and prompt user to `config_share init` @done(25-11-01 01:31)
+✔ Move to `anyhow`(https://docs.rs/anyhow/latest/anyhow/) for the results that we return for better error logging @done(25-11-10 22:39)
+☐ Maybe a better default for the method when adding a file would be to prompt the user for the method, but have an option to just use the file path
+☐ When we pull down a config file that we dont't know a local path for, we should prompt the user for a local path and save that path

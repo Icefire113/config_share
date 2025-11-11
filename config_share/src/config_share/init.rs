@@ -1,4 +1,6 @@
+use anyhow::anyhow;
 use dialoguer::Confirm;
+use gethostname::gethostname;
 use lazy_static::lazy_static;
 use std::path::PathBuf;
 use url::{ParseError, Url};
@@ -18,17 +20,13 @@ lazy_static! {
 
 impl ConfigShare {
     /// Initialize config_share, creates the config file, and prompts the user to configure the app.
-    pub(crate) fn initialize(
-        &mut self,
-        force: bool,
-        skip_setup: bool,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub(crate) fn initialize(&mut self, overwrite: bool, skip_setup: bool) -> anyhow::Result<()> {
         dprint(format!(
-            "[init.initialize] force={}, skip_setup={}",
-            force, skip_setup
+            "[init.initialize] overwrite={}, skip_setup={}",
+            overwrite, skip_setup
         ));
 
-        self.create_config_file(force)?;
+        self.create_config_file(overwrite)?;
         if !skip_setup {
             self.populate_config()?;
         }
@@ -36,7 +34,7 @@ impl ConfigShare {
         Ok(())
     }
 
-    fn populate_config(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    fn populate_config(&mut self) -> anyhow::Result<()> {
         let server_url: Url;
 
         loop {
@@ -45,8 +43,7 @@ impl ConfigShare {
                 .with_prompt("Enter the server that you want to sync your files to")
                 .with_initial_text("http://localhost:3000")
                 .clone()
-                .interact_text()
-                .unwrap();
+                .interact_text()?;
 
             dprint(format!("[init.populate_config] input={}", input));
 
@@ -60,13 +57,12 @@ impl ConfigShare {
                     break;
                 }
                 Err(ParseError::RelativeUrlWithoutBase) => {
-                    // TODO: Make this return Err properly
-                    eprintln!("Err: Server URL must have a base (e.g. http:// or https://)")
+                    return Err(anyhow!(
+                        "Err: Server URL must have a base (e.g. http:// or https://)"
+                    ));
                 }
                 Err(e) => {
-                    // TODO: Make this return Err properly
-                    dprint(format!("[init.populate_config] e={}", e));
-                    eprintln!("Err: {}", e)
+                    return Err(anyhow!("Err: {}", e));
                 }
             }
         }
@@ -92,19 +88,31 @@ impl ConfigShare {
             enable_worker
         ));
 
+        let machine_id = dialoguer::Input::<String>::new()
+            .allow_empty(false)
+            .with_prompt("Enter the friendly name of the pc that you are using")
+            .with_initial_text(
+                gethostname()
+                    .into_string()
+                    .unwrap_or("MachineID".to_string()),
+            )
+            .clone()
+            .interact_text()?;
+        self.settings.machine_id = machine_id;
+
         self.save_settings()?;
         Ok(())
     }
 
-    fn create_config_file(&mut self, force: bool) -> Result<(), Box<dyn std::error::Error>> {
+    fn create_config_file(&mut self, overwrite: bool) -> anyhow::Result<()> {
         dprint(format!(
             "[init.create_config_file] Using CONFIG_FILE_PATH={}",
             CONFIG_FILE_PATH.to_str().unwrap()
         ));
 
-        if !force && CONFIG_FILE_PATH.try_exists()? {
-            return Err(Box::from(
-                "config_share has already been initialized, use config_share init --overwrite to overwrite the config file",
+        if !overwrite && CONFIG_FILE_PATH.try_exists()? {
+            return Err(anyhow!(
+                "config_share has already been initialized, use config_share init --overwrite to overwrite the config file"
             ));
         }
 

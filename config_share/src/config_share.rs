@@ -1,3 +1,4 @@
+use anyhow::{Context, anyhow};
 use std::{
     fs::File,
     io::{Read, Write},
@@ -7,6 +8,7 @@ use crate::share_settings::ShareSettings;
 
 mod add_file;
 mod init;
+mod startup_checks;
 mod sync;
 
 pub struct ConfigShare {
@@ -24,11 +26,11 @@ impl Default for ConfigShare {
 
 impl ConfigShare {
     /// Loads the settings from the config file
-    pub fn load_settings(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if !init::CONFIG_FILE_PATH.try_exists().unwrap() {
-            return Err(
-                "Config file does not exist, please use `config_share init` to set one up".into(),
-            );
+    pub fn load_settings(&mut self) -> anyhow::Result<()> {
+        if !init::CONFIG_FILE_PATH.try_exists()? {
+            return Err(anyhow!(
+                "Config file does not exist, please use `config_share init` to set one up"
+            ));
         }
 
         let mut file = File::options()
@@ -38,34 +40,26 @@ impl ConfigShare {
 
         let mut buff = String::new();
         file.read_to_string(&mut buff)?;
-        let s: Result<ShareSettings, serde_json::Error> = serde_json::from_str(&buff);
-
-        self.settings = s.unwrap();
+        self.settings = serde_json::from_str(&buff)
+            .with_context(|| "Failed to parse the saved json settings into a struct of the current settings, is the saved settings from an older version?")?;
 
         Ok(())
     }
 
     /// Saves the settings in `self.settings` to the config file
-    pub fn save_settings(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save_settings(&self) -> anyhow::Result<()> {
         let mut file = File::options()
             .write(true)
             .create(true)
             .truncate(true)
-            .open(init::CONFIG_FILE_PATH.as_path())?;
+            .open(init::CONFIG_FILE_PATH.as_path())
+            .with_context(|| "Failed to open the config file to save the settings")?;
 
-        file.write(serde_json::to_string(&self.settings)?.as_bytes())?;
+        file.write(serde_json::to_string(&self.settings)?.as_bytes())
+            .with_context(|| "Failed to write the settings into the config file")?;
 
         file.flush()?;
         file.sync_data()?;
-        Ok(())
-    }
-
-    pub fn check_initialized(&self) -> Result<(), Box<dyn std::error::Error>> {
-        if !init::CONFIG_FILE_PATH.try_exists().unwrap() {
-            return Err(
-                "Config file does not exist, please use `config_share init` to set one up".into(),
-            );
-        }
         Ok(())
     }
 }
