@@ -52,7 +52,6 @@ impl ConfigShare {
                     .into_string()
                     .unwrap_or("MachineID".to_string()),
             )
-            .clone()
             .interact_text()?;
         self.settings.machine_id = machine_id;
         Ok(())
@@ -84,7 +83,6 @@ impl ConfigShare {
                 .allow_empty(false)
                 .with_prompt("Enter the server that you want to sync your files to")
                 .with_initial_text("http://localhost:3000")
-                .clone()
                 .interact_text()?;
 
             dprint(format!("[init.populate_config] input={}", input));

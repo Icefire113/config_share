@@ -39,7 +39,17 @@ impl ConfigShare {
                 )
                 .with_context(|| "Failed to select a method, this is a bug, please report it")?;
             if method == FileDifferentationMethod::CustomName {
-                todo!("Prompt for the custom name");
+                let custom_name = dialoguer::Input::<String>::new()
+                    .allow_empty(false)
+                    .default(
+                        path.canonicalize()?
+                            .to_str()
+                            .with_context(|| anyhow!("Failed to get the canonicalized path and convert it to a string, does the file path contain invalid UTF-8?"))?
+                            .to_string(),
+                    )
+                    .interact()?;
+
+                todo!("Some way of saving the custom name");
             }
         }
 

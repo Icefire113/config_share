@@ -37,8 +37,8 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
         Some(("add", sub_matches)) => {
             dprint("[main.sub_command] add");
             app.check_initialized()?;
-            app.all_startup_checks()?;
             app.load_settings()?;
+            app.all_startup_checks()?;
 
             app.add_file(
                 // unwrap is safe here as the subcommand "add" has "file" as a required argument

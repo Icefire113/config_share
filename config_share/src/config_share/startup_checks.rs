@@ -6,6 +6,7 @@ use util::dprint;
 use crate::config_share::{ConfigShare, init};
 
 impl ConfigShare {
+    /// Startup checks for the app after all settings are loaded
     pub fn all_startup_checks(&self) -> anyhow::Result<()> {
         // self.check_last_manual_sync()?;
         self.check_machine_id_blank()?;
