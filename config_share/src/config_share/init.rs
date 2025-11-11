@@ -35,8 +35,50 @@ impl ConfigShare {
     }
 
     fn populate_config(&mut self) -> anyhow::Result<()> {
-        let server_url: Url;
+        self.populate_config_server()?;
+        self.populate_config_enable_worker()?;
+        self.populate_config_machine_id()?;
 
+        self.save_settings()?;
+        Ok(())
+    }
+
+    fn populate_config_machine_id(&mut self) -> anyhow::Result<()> {
+        let machine_id = dialoguer::Input::<String>::new()
+            .allow_empty(false)
+            .with_prompt("Enter the friendly name of the pc that you are using")
+            .with_initial_text(
+                gethostname()
+                    .into_string()
+                    .unwrap_or("MachineID".to_string()),
+            )
+            .clone()
+            .interact_text()?;
+        self.settings.machine_id = machine_id;
+        Ok(())
+    }
+
+    fn populate_config_enable_worker(&mut self) -> anyhow::Result<()> {
+        let enable_worker = Confirm::new()
+            .with_prompt(
+                "Do you want to enable the worker to sync your files in the background? \
+            This will run the worker in the background when you log in.",
+            )
+            .default(false)
+            .interact()?;
+        if enable_worker {
+            println!("Enabling worker");
+        }
+        self.settings.enable_worker = enable_worker;
+        dprint(format!(
+            "[init.populate_config] Setting enable_worker={}",
+            enable_worker
+        ));
+        Ok(())
+    }
+
+    fn populate_config_server(&mut self) -> anyhow::Result<()> {
+        let server_url: Url;
         loop {
             let input = dialoguer::Input::<String>::new()
                 .allow_empty(false)
@@ -69,38 +111,6 @@ impl ConfigShare {
         println!("Using server URL: {}", server_url);
         self.settings.server_url = Some(server_url);
 
-        let enable_worker = Confirm::new()
-            .with_prompt(
-                "Do you want to enable the worker to sync your files in the background? \
-            This will run the worker in the background when you log in.",
-            )
-            .default(false)
-            .interact()?;
-
-        // TODO: Set the worker service to run on user login
-        if enable_worker {
-            println!("Enabling worker");
-        }
-        self.settings.enable_worker = enable_worker;
-
-        dprint(format!(
-            "[init.populate_config] Setting enable_worker={}",
-            enable_worker
-        ));
-
-        let machine_id = dialoguer::Input::<String>::new()
-            .allow_empty(false)
-            .with_prompt("Enter the friendly name of the pc that you are using")
-            .with_initial_text(
-                gethostname()
-                    .into_string()
-                    .unwrap_or("MachineID".to_string()),
-            )
-            .clone()
-            .interact_text()?;
-        self.settings.machine_id = machine_id;
-
-        self.save_settings()?;
         Ok(())
     }
 
