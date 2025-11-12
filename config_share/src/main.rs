@@ -63,6 +63,8 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
 fn cli() -> Command {
     let mut c = command!()
         .about("Utility for syncing config files across multiple machines")
+        // We dont use this as we check this ourselves because we want to check if the config has already
+        // been populated
         // .arg_required_else_help(true)
         .subcommand(
             Command::new("init")
