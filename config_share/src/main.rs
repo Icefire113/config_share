@@ -7,6 +7,7 @@ use util::dprint;
 
 mod config_share;
 mod file_differentation_method;
+mod fn_error;
 mod share_settings;
 mod tracked_file_info;
 
@@ -16,7 +17,7 @@ fn main() -> anyhow::Result<()> {
     match run(&mut app) {
         Ok(_) => anyhow::Ok(()),
         Err(e) => {
-            eprintln!("{}: {}", style("error").red().bold(), e);
+            eprintln!("{}: {:?}", style("error").red().bold(), e);
             exit(1);
         }
     }

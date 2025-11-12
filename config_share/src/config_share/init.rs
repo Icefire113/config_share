@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use url::{ParseError, Url};
 use util::dprint;
 
-use crate::{config_share::ConfigShare, share_settings::ShareSettings};
+use crate::{config_share::ConfigShare, fn_error::FnError, share_settings::ShareSettings};
 
 lazy_static! {
     #[derive(Debug)]
@@ -112,21 +112,21 @@ impl ConfigShare {
         Ok(())
     }
 
-    fn create_config_file(&mut self, overwrite: bool) -> anyhow::Result<()> {
+    fn create_config_file(&mut self, overwrite: bool) -> anyhow::Result<FnError> {
         dprint(format!(
             "[init.create_config_file] Using CONFIG_FILE_PATH={}",
             CONFIG_FILE_PATH.to_str().unwrap()
         ));
 
         if !overwrite && CONFIG_FILE_PATH.try_exists()? {
-            return Err(anyhow!(
-                "config_share has already been initialized, use config_share init --overwrite to overwrite the config file"
+            return Ok(FnError::message(
+                "config_share has already been initialized, use config_share init --overwrite to overwrite the config file",
             ));
         }
 
         self.settings = ShareSettings::default();
 
         self.save_settings()?;
-        Ok(())
+        Ok(FnError::Empty)
     }
 }
