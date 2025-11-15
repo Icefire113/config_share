@@ -112,21 +112,21 @@ impl ConfigShare {
         Ok(())
     }
 
-    fn create_config_file(&mut self, overwrite: bool) -> anyhow::Result<FnError> {
+    fn create_config_file(&mut self, overwrite: bool) -> anyhow::Result<()> {
         dprint(format!(
             "[init.create_config_file] Using CONFIG_FILE_PATH={}",
             CONFIG_FILE_PATH.to_str().unwrap()
         ));
 
         if !overwrite && CONFIG_FILE_PATH.try_exists()? {
-            return Ok(FnError::message(
-                "config_share has already been initialized, use config_share init --overwrite to overwrite the config file",
+            return Err(anyhow!(
+                "config_share has already been initialized, use config_share init --overwrite to overwrite the config file"
             ));
         }
 
         self.settings = ShareSettings::default();
 
         self.save_settings()?;
-        Ok(FnError::Empty)
+        Ok(())
     }
 }
