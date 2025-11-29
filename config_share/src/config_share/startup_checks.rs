@@ -24,7 +24,8 @@ impl ConfigShare {
             < Utc::now()
             .checked_sub_signed(TimeDelta::hours(self.settings.manual_sync_reminder_time))
             .with_context(|| 
-                format!("[startup_checks.check_last_manual_sync] Failed to subtract {} hours from the current date", self.settings.manual_sync_reminder_time))?
+                format!("[startup_checks.check_last_manual_sync] Failed to subtract {} hours from the current date", 
+                self.settings.manual_sync_reminder_time))?
         {
             todo!("Run a manual sync with the server")
         }
@@ -41,7 +42,8 @@ impl ConfigShare {
         Ok(())
     }
 
-    pub fn check_initialized(&self) -> anyhow::Result<()> {
+    /// Checks if the config file is present
+    pub fn check_is_config_setup(&self) -> anyhow::Result<()> {
         if !init::CONFIG_FILE_PATH.try_exists()? {
             return Err(anyhow!(
                 "Config file does not exist, please use `config_share init` to set one up"

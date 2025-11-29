@@ -9,13 +9,11 @@ use crate::tracked_file_info::TrackedFile;
 #[derive(Serialize, Deserialize)]
 // Struct for storing settings for the program that will be saved to disk
 pub(crate) struct ShareSettings {
-    /// A list of the files that are being tracked locally
+    /// A mapping from the custom name of the file to the file information
     pub(crate) tracked_files: HashMap<String, TrackedFile>,
     /// The last time the user synced with the server manually
     pub(crate) last_sync: Option<DateTime<Utc>>,
     pub(crate) server_url: Option<Url>,
-    /// Whether or not to run the worker in the background when the user logs in
-    pub(crate) enable_worker: bool,
     /// The version of the program that the config was last updated with
     pub(crate) version: String,
     /// The time in hours before the user is reminded to manually sync
@@ -30,7 +28,6 @@ impl Default for ShareSettings {
             tracked_files: HashMap::new(),
             last_sync: None,
             server_url: None,
-            enable_worker: false,
             version: env!("CARGO_PKG_VERSION").to_string(),
             manual_sync_reminder_time: 24,
             machine_id: "".to_string(),

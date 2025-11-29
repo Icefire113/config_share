@@ -10,8 +10,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use twox_hash::XxHash3_64;
 
-use crate::file_differentation_method::FileDifferentationMethod;
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TrackedFile {
     /// The path to where the file is stored locally
@@ -20,7 +18,7 @@ pub struct TrackedFile {
     pub(crate) hash: u64,
     pub(crate) file_last_modified: DateTime<Utc>,
     pub(crate) last_checked: Option<DateTime<Utc>>,
-    pub(crate) differentation_method: FileDifferentationMethod,
+    pub(crate) use_custom_name: Option<String>,
 
     /// A map of machine ids to file paths
     pub(crate) path_per_machine: HashMap<String, PathBuf>,
@@ -29,8 +27,8 @@ pub struct TrackedFile {
 impl TrackedFile {
     pub fn create_from_filepath(
         file_path: &Path,
-        differentation_method: FileDifferentationMethod,
         machine_id: &String,
+        use_custom_name: Option<String>,
     ) -> anyhow::Result<Self> {
         let mut file = File::open(file_path).with_context(
             || "Failed to open the file for reading, grabbing metadata and hashing the contents",
@@ -47,7 +45,7 @@ impl TrackedFile {
             hash: XxHash3_64::oneshot(&data),
             file_last_modified: file.metadata()?.modified()?.into(),
             last_checked: None,
-            differentation_method,
+            use_custom_name,
             path_per_machine: map,
         })
     }

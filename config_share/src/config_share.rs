@@ -9,6 +9,7 @@ use crate::share_settings::ShareSettings;
 mod add_file;
 mod init;
 mod list_files;
+mod remove;
 mod startup_checks;
 mod sync;
 

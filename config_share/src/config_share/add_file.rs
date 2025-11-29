@@ -1,13 +1,9 @@
 use std::path::Path;
 
 use anyhow::{Context, anyhow};
-use strum::IntoEnumIterator;
 use util::{display_option, dprint, get_path_as_string};
 
-use crate::{
-    config_share::ConfigShare, file_differentation_method::FileDifferentationMethod,
-    tracked_file_info::TrackedFile,
-};
+use crate::{config_share::ConfigShare, tracked_file_info::TrackedFile};
 
 impl ConfigShare {
     pub fn add_file(
@@ -17,7 +13,9 @@ impl ConfigShare {
         prompt_for_method: bool,
     ) -> anyhow::Result<()> {
         dprint(format!("[add_file.add_file] Adding file: {}", file_path));
-        let path = Path::new(file_path);
+        let path = Path::new(file_path).canonicalize().with_context(
+                || anyhow!("[config_share.add_file] Failed to get the canonicalized path and convert it to a string, does the file path contain invalid UTF-8?")
+            )?;
 
         if !path.is_file() {
             return Err(anyhow!(
@@ -26,79 +24,76 @@ impl ConfigShare {
             ));
         }
 
-        let mut method = FileDifferentationMethod::FileName;
+        let methods = vec!["File Path", "Custom Name"];
+
+        let mut custom_name: Option<String> = None;
 
         if prompt_for_method {
-            method = FileDifferentationMethod::iter()
-                .nth(
-                    dialoguer::Select::new()
-                        .with_prompt("Select a method to differentiate between files")
-                        .items::<&_, &Vec<_>>(&FileDifferentationMethod::iter().collect())
-                        .default(0)
-                        .interact()?,
-                )
-                .with_context(|| "Failed to select a method, this is a bug, please report it")?;
-
-            if method == FileDifferentationMethod::CustomName("".to_string()) {
-                let custom_name = dialoguer::Input::<String>::new()
+            let m = dialoguer::Select::new()
+                .with_prompt("Select a method to differentiate between files")
+                .items(methods)
+                .default(0)
+                .interact()?;
+            if m == 1 {
+                let name = dialoguer::Input::<String>::new()
                     .allow_empty(false)
                     .default(
                         path.canonicalize()?
                             .to_str()
-                            .with_context(|| anyhow!("Failed to get the canonicalized path and convert it to a string, does the file path contain invalid UTF-8?"))?
+                            .with_context(
+                                || anyhow!("[config_share.add_file] Failed to get the canonicalized path and convert it to a string, does the file path contain invalid UTF-8?"))?
                             .to_string(),
                     )
                     .interact()?;
 
                 dprint(format!(
                     "[config_share.add_file] Using custom_name = {}",
-                    custom_name
+                    name
                 ));
-
-                method = FileDifferentationMethod::CustomName(custom_name);
+                custom_name = Some(name);
             }
         }
 
-        if is_already_tracked(self, path)? {
+        // If we have already added the file to be tracked, don't add it again and inform the user
+        if self
+            .settings
+            .tracked_files
+            .iter()
+            .any(|e| e.1.file_path == path)
+        {
             return Err(anyhow!(
                 "The file {} is already tracked, custom name: {}",
                 file_path,
                 display_option(
                     self.settings
                         .tracked_files
-                        .get(&get_path_as_string(path)?)
+                        .get(&get_path_as_string(path.as_path())?)
                         .with_context(|| anyhow!("[config_share.add_file] Failed to get from the hashmap after we just checked if it contains the key, wtf"))
                         .unwrap()
-                        .differentation_method
-                        .get_custom_name()
+                        .use_custom_name
+                        .clone()
                 )
             ));
         }
 
         self.settings.tracked_files.insert(
-            if method == FileDifferentationMethod::FileName {
-                get_path_as_string(path)?
+            if custom_name.is_none() {
+                get_path_as_string(path.as_path())?
             } else {
-                method
-                    .get_custom_name()
+                custom_name.clone()
                     .with_context(
                         || anyhow!("[config_share.add_file] Failed to get the custom name when the method is not FileName, this is a bug, please report it")
                     )?
-                    .clone()
             },
-            TrackedFile::create_from_filepath(path, method, &self.settings.machine_id)?,
+            TrackedFile::create_from_filepath(path.as_path(), &self.settings.machine_id, custom_name)?,
         );
         self.save_settings()?;
 
+        println!(
+            "File {} has been added, you can now run `config_share sync` to sync the file to the server",
+            file_path
+        );
+
         Ok(())
     }
-}
-
-// stupid fuck
-fn is_already_tracked(s: &ConfigShare, path: &Path) -> anyhow::Result<bool> {
-    Ok(s.settings.tracked_files.values().any(|v| {
-        dbg!(v);
-        dbg!(path);
-        v.file_path == *path
-    }))
 }

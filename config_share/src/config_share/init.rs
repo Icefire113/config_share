@@ -1,5 +1,4 @@
 use anyhow::anyhow;
-use dialoguer::Confirm;
 use gethostname::gethostname;
 use lazy_static::lazy_static;
 use std::path::PathBuf;
@@ -36,7 +35,6 @@ impl ConfigShare {
 
     fn populate_config(&mut self) -> anyhow::Result<()> {
         self.populate_config_server()?;
-        self.populate_config_enable_worker()?;
         self.populate_config_machine_id()?;
 
         self.save_settings()?;
@@ -54,25 +52,6 @@ impl ConfigShare {
             )
             .interact_text()?;
         self.settings.machine_id = machine_id;
-        Ok(())
-    }
-
-    fn populate_config_enable_worker(&mut self) -> anyhow::Result<()> {
-        let enable_worker = Confirm::new()
-            .with_prompt(
-                "Do you want to enable the worker to sync your files in the background? \
-            This will run the worker in the background when you log in.",
-            )
-            .default(false)
-            .interact()?;
-        if enable_worker {
-            println!("Enabling worker");
-        }
-        self.settings.enable_worker = enable_worker;
-        dprint(format!(
-            "[init.populate_config] Setting enable_worker={}",
-            enable_worker
-        ));
         Ok(())
     }
 
