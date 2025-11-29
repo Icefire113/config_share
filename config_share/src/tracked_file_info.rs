@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs::File,
     io::Read,
     path::{Path, PathBuf},
@@ -11,8 +12,8 @@ use twox_hash::XxHash3_64;
 
 use crate::file_differentation_method::FileDifferentationMethod;
 
-#[derive(Serialize, Deserialize)]
-pub struct TrackedFileInfo {
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TrackedFile {
     /// The path to where the file is stored locally
     pub(crate) file_path: PathBuf,
     // xxhash3 hash of the local file contents
@@ -20,12 +21,16 @@ pub struct TrackedFileInfo {
     pub(crate) file_last_modified: DateTime<Utc>,
     pub(crate) last_checked: Option<DateTime<Utc>>,
     pub(crate) differentation_method: FileDifferentationMethod,
+
+    /// A map of machine ids to file paths
+    pub(crate) path_per_machine: HashMap<String, PathBuf>,
 }
 
-impl TrackedFileInfo {
+impl TrackedFile {
     pub fn create_from_filepath(
         file_path: &Path,
         differentation_method: FileDifferentationMethod,
+        machine_id: &String,
     ) -> anyhow::Result<Self> {
         let mut file = File::open(file_path).with_context(
             || "Failed to open the file for reading, grabbing metadata and hashing the contents",
@@ -34,12 +39,16 @@ impl TrackedFileInfo {
         file.read_to_end(&mut data)
             .with_context(|| "Failed to read the entire file into a buffer")?;
 
+        let mut map = HashMap::new();
+        map.insert(machine_id.clone(), file_path.canonicalize()?.to_path_buf());
+
         Ok(Self {
-            file_path: file_path.to_path_buf(),
+            file_path: file_path.canonicalize()?.to_path_buf(),
             hash: XxHash3_64::oneshot(&data),
             file_last_modified: file.metadata()?.modified()?.into(),
             last_checked: None,
             differentation_method,
+            path_per_machine: map,
         })
     }
 }

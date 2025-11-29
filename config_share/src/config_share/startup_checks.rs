@@ -1,6 +1,4 @@
-use std::backtrace::Backtrace;
-
-use anyhow::{Context, anyhow, bail};
+use anyhow::{Context, anyhow,};
 use chrono::{TimeDelta, Utc};
 use console::style;
 use util::dprint;

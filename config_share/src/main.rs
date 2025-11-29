@@ -48,6 +48,14 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
                 sub_matches.get_flag("ask-method"),
             )?;
         }
+        Some(("list", _)) => {
+            dprint("[main.sub_command] list");
+            app.check_initialized()?;
+            app.load_settings()?;
+            app.all_startup_checks()?;
+
+            app.list_files()?;
+        }
         None => {
             // this is still an error, but we should also check if the user has
             // initialized the config aswell as show the usage/ help options
@@ -101,6 +109,17 @@ fn cli() -> Command {
                 .help("Prompts the user to select a method to name files (default is the local file name)")
             )
             .about("Adds a file to the list of files that will be synced")
+        )
+        .subcommand(Command::new("sync")
+        .arg(
+            Arg::new("file")
+            .required(false)
+            .help("Optional: The specific file to sync with the server")
+        )
+        .about("Syncs the saved config files with the specified remote server"))
+        .subcommand(
+            Command::new("list")
+            .about("Lists the files that are currently tracked locally")
         );
     c.build();
 

@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use url::{ParseError, Url};
 use util::dprint;
 
-use crate::{config_share::ConfigShare, fn_error::FnError, share_settings::ShareSettings};
+use crate::{config_share::ConfigShare, share_settings::ShareSettings};
 
 lazy_static! {
     #[derive(Debug)]

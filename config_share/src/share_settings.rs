@@ -1,13 +1,16 @@
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::tracked_file_info::TrackedFileInfo;
+use crate::tracked_file_info::TrackedFile;
 
 #[derive(Serialize, Deserialize)]
 // Struct for storing settings for the program that will be saved to disk
 pub(crate) struct ShareSettings {
-    pub(crate) tracked_files: Vec<TrackedFileInfo>,
+    /// A list of the files that are being tracked locally
+    pub(crate) tracked_files: HashMap<String, TrackedFile>,
     /// The last time the user synced with the server manually
     pub(crate) last_sync: Option<DateTime<Utc>>,
     pub(crate) server_url: Option<Url>,
@@ -24,7 +27,7 @@ impl Default for ShareSettings {
     /// Creates a new ShareSettings struct with the default values, and no tracked files
     fn default() -> Self {
         Self {
-            tracked_files: Vec::new(),
+            tracked_files: HashMap::new(),
             last_sync: None,
             server_url: None,
             enable_worker: false,
@@ -32,12 +35,5 @@ impl Default for ShareSettings {
             manual_sync_reminder_time: 24,
             machine_id: "".to_string(),
         }
-    }
-}
-
-impl ShareSettings {
-    /// Migrates the old settings to the new settings, updates the version, and handles all translations between config versions
-    pub fn migrate(old: ShareSettings) -> Self {
-        ShareSettings::default()
     }
 }
