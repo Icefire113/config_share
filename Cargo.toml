@@ -1,3 +1,8 @@
 [workspace]
 resolver = "3"
-members = ["cfg_share_worker", "config_share", "sync_server", "util"]
+members = [
+    "./crates/cfg_share_worker",
+    "./crates/config_share",
+    "./crates/sync_server",
+    "./crates/util",
+]

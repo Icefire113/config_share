@@ -1,4 +1,4 @@
-use anyhow::{Context, anyhow,};
+use anyhow::{Context, anyhow};
 use chrono::{TimeDelta, Utc};
 use console::style;
 use util::dprint;
@@ -23,7 +23,7 @@ impl ConfigShare {
         if self.settings.last_sync.unwrap()
             < Utc::now()
             .checked_sub_signed(TimeDelta::hours(self.settings.manual_sync_reminder_time))
-            .with_context(|| 
+            .with_context(||
                 format!("[startup_checks.check_last_manual_sync] Failed to subtract {} hours from the current date", 
                 self.settings.manual_sync_reminder_time))?
         {
@@ -36,7 +36,10 @@ impl ConfigShare {
     pub fn check_machine_id_blank(&self) -> anyhow::Result<()> {
         dprint("[startup_checks.check_machine_id] Checking machine id.");
         if self.settings.machine_id.trim().is_empty() {
-            println!("{}: The machine id in the config file is currently blank, please change it to something unique", style("warning").yellow().bold());
+            println!(
+                "{}: The machine id in the config file is currently blank, please change it to something unique",
+                style("warning").yellow().bold()
+            );
             return Ok(());
         }
         Ok(())
