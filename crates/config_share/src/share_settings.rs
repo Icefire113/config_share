@@ -6,7 +6,7 @@ use url::Url;
 
 use crate::tracked_file_info::TrackedFile;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 // Struct for storing settings for the program that will be saved to disk
 pub(crate) struct ShareSettings {
     /// A mapping from the custom name of the file to the file information
@@ -29,7 +29,7 @@ impl Default for ShareSettings {
             last_sync: None,
             server_url: None,
             version: env!("CARGO_PKG_VERSION").to_string(),
-            manual_sync_reminder_time: 24,
+            manual_sync_reminder_time: 24 * 7, // 24hrs * 7 = 1 week
             machine_id: "".to_string(),
         }
     }

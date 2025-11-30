@@ -60,6 +60,10 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
         }
         Some(("remove", sub_matches)) => {
             dprint("[main.sub_command] remove");
+            app.check_is_config_setup()?;
+            app.load_settings()?;
+            app.all_startup_checks()?;
+
             app.remove_file(sub_matches.get_one::<String>("file").with_context(|| {
                 // if this ever occurs, it's a bug as we set the argument to be required when creating the subcommand in clap
                 anyhow!("[main.sub_command] remove: Failed to get the file option, this is a bug")
@@ -67,6 +71,10 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
         }
         Some(("sync", _)) => {
             dprint("[main.sub_command] sync");
+            app.check_is_config_setup()?;
+            app.load_settings()?;
+            app.all_startup_checks()?;
+
             app.sync_files()?;
         }
         None => {

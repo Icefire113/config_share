@@ -13,6 +13,7 @@ mod remove;
 mod startup_checks;
 mod sync;
 
+#[derive(Debug)]
 pub struct ConfigShare {
     settings: ShareSettings,
 }

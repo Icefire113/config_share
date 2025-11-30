@@ -17,6 +17,7 @@ pub struct TrackedFile {
     // xxhash3 hash of the local file contents
     pub(crate) hash: u64,
     pub(crate) file_last_modified: DateTime<Utc>,
+    /// The last time the file was checked to be up to date with the server
     pub(crate) last_checked: Option<DateTime<Utc>>,
     pub(crate) use_custom_name: Option<String>,
 

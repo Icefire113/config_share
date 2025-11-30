@@ -17,17 +17,23 @@ impl ConfigShare {
         dprint("[startup_checks.check_last_manual_sync] Checking last manual sync.");
 
         if self.settings.last_sync.is_none() {
-            todo!("Run a manual sync with the server")
+            return self.sync_files();
         }
 
-        if self.settings.last_sync.unwrap()
-            < Utc::now()
+        let time_since_last_sync = Utc::now()
             .checked_sub_signed(TimeDelta::hours(self.settings.manual_sync_reminder_time))
             .with_context(||
-                format!("[startup_checks.check_last_manual_sync] Failed to subtract {} hours from the current date", 
-                self.settings.manual_sync_reminder_time))?
-        {
-            todo!("Run a manual sync with the server")
+                anyhow!("[startup_checks.check_last_manual_sync] Failed to subtract {} hours from the current date", 
+                self.settings.manual_sync_reminder_time)
+            )?;
+
+        // if the last sync time is older than current time - sync reminder time inform user
+        if self.settings.last_sync.unwrap() < time_since_last_sync {
+            println!(
+                "{}: It's been {} hours since your last manual sync, please sync with the server, or change reminder time in the config",
+                style("warning").yellow().bold(),
+                time_since_last_sync
+            );
         }
 
         Ok(())
