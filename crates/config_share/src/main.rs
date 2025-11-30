@@ -95,6 +95,7 @@ fn cli() -> Command {
         // We dont use this as we check this ourselves because we want to check if the config has already
         // been populated
         // .arg_required_else_help(true)
+        // init subcommand
         .subcommand(
             Command::new("init")
                 .arg(
@@ -111,7 +112,7 @@ fn cli() -> Command {
                 )
                 .about("Checks if config_share has been initialized and if not initializes it"),
         )
-
+        // add subcommand
         .subcommand(
             Command::new("add")
             .arg(
@@ -132,7 +133,7 @@ fn cli() -> Command {
             )
             .about("Adds a file to the list of files that will be synced")
         )
-
+        // sync subcommand
         .subcommand(
             Command::new("sync")
             .about("Syncs all files with the server")
@@ -141,13 +142,14 @@ fn cli() -> Command {
                 .required(false)
                 .help("Optional: The specific file to sync with the server")
             )
-            .about("Syncs the saved config files with the specified remote server"))
-
+            .about("Syncs the saved config files with the specified remote server")
+        )
+        // list subcommand
         .subcommand(
             Command::new("list")
             .about("Lists the files that are currently tracked locally")
         )
-
+        // remove subcommand
         .subcommand(
             Command::new("remove")
             .about("Removes a file from the ones that are currently tracked")

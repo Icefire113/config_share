@@ -1,7 +1,7 @@
 use crate::config_share::ConfigShare;
 use anyhow::Ok;
 use console::style;
-use util::get_path_as_string;
+use util::display_option;
 
 impl ConfigShare {
     pub fn list_files(&self) -> anyhow::Result<()> {
@@ -11,10 +11,10 @@ impl ConfigShare {
         }
 
         println!(
-            "{: <40} | {: <20} | {: <30}",
+            "{: <40} | {: <30} | {: <20}",
             style("File Path").bold(),
-            style("Method").bold(),
-            style("Last Modified").bold()
+            style("Last Modified").bold(),
+            style("Custom Name").bold(),
         );
         println!("{}", style("-".repeat(100)));
 
@@ -22,12 +22,8 @@ impl ConfigShare {
             println!(
                 "{: <40} | {: <20} | {: <30}",
                 file_info.1.file_path.to_string_lossy(),
-                file_info
-                    .1
-                    .use_custom_name
-                    .clone()
-                    .unwrap_or(get_path_as_string(file_info.1.file_path.as_path())?),
-                file_info.1.file_last_modified.to_rfc2822()
+                file_info.1.file_last_modified.to_rfc2822(),
+                display_option(file_info.1.use_custom_name.clone()),
             );
         }
 
