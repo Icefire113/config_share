@@ -77,6 +77,14 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
 
             app.sync_files()?;
         }
+        Some(("check", sub_matches)) => {
+            dprint("[main.sub_command] check");
+            app.check_is_config_setup()?;
+            app.load_settings()?;
+            app.all_startup_checks()?;
+
+            app.check_files(sub_matches.get_one::<String>("file"))?;
+        }
         None => {
             // this is still an error, but we should also check if the user has
             // initialized the config aswell as show the usage/ help options
@@ -157,6 +165,16 @@ fn cli() -> Command {
                 Arg::new("file")
                 .required(true)
                 .help("The file to remove")
+            )
+        )
+        // check subcommand
+        .subcommand(
+            Command::new("check")
+            .about("Checks the files that are currently tracked locally, but does not sync with the server")
+            .arg(
+                Arg::new("file")
+                .required(false)
+                .help("The file to check, if not specified all files currently tracked will be checked")
             )
         );
     c.build();

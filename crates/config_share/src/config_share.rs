@@ -7,6 +7,7 @@ use std::{
 use crate::share_settings::ShareSettings;
 
 mod add_file;
+mod check_files;
 mod init;
 mod list_files;
 mod remove;

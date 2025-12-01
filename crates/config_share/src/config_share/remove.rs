@@ -9,7 +9,7 @@ impl ConfigShare {
         dprint(format!("[config_share.remove] Attempting to remove file: {}", file_path));
         let file_path = Path::new(file_path);
         
-        if !file_path.try_exists()? {
+        if !file_path.try_exists()? || !file_path.is_file() {
             return Err(anyhow!("{} is not a file or does not exist", get_path_as_string(&file_path)?));
         }
         let file_path = file_path
@@ -17,12 +17,11 @@ impl ConfigShare {
             .with_context(|| anyhow!("[config_share.remove] Failed to get canonical path for a path that we know exists"))?;
 
         let mut to_remove: Option<String> = None;
-        for o in self.settings.tracked_files.iter() {
-            let f = o.1.path_per_machine.get(&self.settings.machine_id);
+        for tracked_file in self.settings.tracked_files.iter() {
+            let f = tracked_file.1.path_per_machine.get(&self.settings.machine_id);
             if f.is_some() {
-                let f = f.unwrap();
-                if get_path_as_string(f)? == *file_path {
-                    to_remove = Some(o.0.clone());
+                if get_path_as_string(f.unwrap())? == *file_path {
+                    to_remove = Some(tracked_file.0.clone());
                     break;
                 }
             }
