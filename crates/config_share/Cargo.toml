@@ -15,5 +15,6 @@ lazy_static = "1.5.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145" }
 twox-hash = "2.1.2"
+ureq = { version = "3.1.4", features = ["json"] }
 url = { version = "2.5.7", features = ["serde"] }
 util = { path = "../util" }

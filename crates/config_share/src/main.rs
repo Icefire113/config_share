@@ -7,6 +7,7 @@ use std::result::Result::Ok;
 use util::dprint;
 
 mod config_share;
+mod net;
 mod share_settings;
 mod tracked_file_info;
 
@@ -46,7 +47,6 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
                     // if this ever occurs, it's a bug as we set the argument to be required when creating the subcommand in clap
                     anyhow!("[main.sub_command] add: Failed to get the file option, this is a bug")
                 })?,
-                sub_matches.get_flag("ignore-permissions"),
                 sub_matches.get_flag("ask-method"),
             )?;
         }
@@ -128,12 +128,13 @@ fn cli() -> Command {
                     .help("The file to add to the list of files that will be synced")
                     .required(true)
             )
-            .arg(
-                Arg::new("ignore-permissions")
-                .long("ignore-permissions")
-                .action(ArgAction::SetTrue)
-                .help("Skips syncing file permissions for this file")
-            )
+            // TODO: Permissions for the file, this might be just a linux only thing
+            // .arg(
+            //     Arg::new("ignore-permissions")
+            //     .long("ignore-permissions")
+            //     .action(ArgAction::SetTrue)
+            //     .help("Skips syncing file permissions for this file")
+            // )
             .arg(Arg::new("ask-method")
                 .long("ask-method")
                 .action(ArgAction::SetTrue)

@@ -6,18 +6,13 @@ use util::{display_option, dprint, get_path_as_string};
 use crate::{config_share::ConfigShare, tracked_file_info::TrackedFile};
 
 impl ConfigShare {
-    pub fn add_file(
-        &mut self,
-        file_path: &String,
-        _ignore_permissions: bool,
-        prompt_for_method: bool,
-    ) -> anyhow::Result<()> {
+    pub fn add_file(&mut self, file_path: &String, prompt_for_method: bool) -> anyhow::Result<()> {
         dprint(format!("[add_file.add_file] Adding file: {}", file_path));
         let path = Path::new(file_path).canonicalize().with_context(
                 || anyhow!("[config_share.add_file] Failed to get the canonicalized path and convert it to a string, does the file path contain invalid UTF-8?")
             )?;
 
-        if !path.is_file() {
+        if !path.try_exists()? || !path.is_file() {
             return Err(anyhow!(
                 "The file {} could not be found, or is not a file",
                 file_path
@@ -83,7 +78,7 @@ impl ConfigShare {
                 custom_name.clone()
                     .with_context(
                         || anyhow!("[config_share.add_file] Failed to get the custom name when the method is not FileName, this is a bug, please report it")
-                    )?
+                    ).unwrap()
             },
             TrackedFile::create_from_filepath(path.as_path(), &self.settings.machine_id, custom_name)?,
         );

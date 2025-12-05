@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use twox_hash::XxHash3_64;
@@ -31,12 +31,14 @@ impl TrackedFile {
         machine_id: &String,
         use_custom_name: Option<String>,
     ) -> anyhow::Result<Self> {
-        let mut file = File::open(file_path).with_context(
-            || "Failed to open the file for reading, grabbing metadata and hashing the contents",
-        )?;
+        let mut file = File::open(file_path).with_context(|| {
+            anyhow!(
+                "Failed to open the file for reading, grabbing metadata and hashing the contents"
+            )
+        })?;
         let mut data: Vec<u8> = Vec::new();
         file.read_to_end(&mut data)
-            .with_context(|| "Failed to read the entire file into a buffer")?;
+            .with_context(|| anyhow!("Failed to read the entire file into a buffer"))?;
 
         let mut map = HashMap::new();
         map.insert(machine_id.clone(), file_path.canonicalize()?.to_path_buf());

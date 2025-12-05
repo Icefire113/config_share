@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
+use anyhow::{Context, anyhow};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -9,7 +10,7 @@ use crate::tracked_file_info::TrackedFile;
 #[derive(Serialize, Deserialize, Debug)]
 // Struct for storing settings for the program that will be saved to disk
 pub(crate) struct ShareSettings {
-    /// A mapping from the custom name of the file to the file information
+    /// A mapping from the custom name of the file (or it's path if no custom name) to the file information
     pub(crate) tracked_files: HashMap<String, TrackedFile>,
     /// The last time the user synced with the server manually
     pub(crate) last_sync: Option<DateTime<Utc>>,
@@ -32,5 +33,19 @@ impl Default for ShareSettings {
             manual_sync_reminder_time: 24 * 7, // 24hrs * 7 = 1 week
             machine_id: "".to_string(),
         }
+    }
+}
+
+impl ShareSettings {
+    pub fn get_tracked_file_from_path(&self, file: &PathBuf) -> anyhow::Result<&TrackedFile> {
+        self.tracked_files
+            .iter()
+            .find_map(|(_, v)| if v.file_path == *file { Some(v) } else { None })
+            .with_context(|| {
+                anyhow!(
+                    "[share_settings.get_tracked_file_from_path] File for given path {} not found",
+                    file.display()
+                )
+            })
     }
 }
