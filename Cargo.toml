@@ -3,6 +3,5 @@ resolver = "3"
 members = [
     "./crates/cfg_share_worker",
     "./crates/config_share",
-    "./crates/sync_server",
     "./crates/util",
 ]
