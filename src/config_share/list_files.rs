@@ -1,7 +1,7 @@
 use crate::config_share::ConfigShare;
+use crate::util::display_option;
 use anyhow::Ok;
 use console::style;
-use util::display_option;
 
 impl ConfigShare {
     pub fn list_files(&self) -> anyhow::Result<()> {

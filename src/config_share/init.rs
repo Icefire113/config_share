@@ -1,9 +1,9 @@
 use anyhow::anyhow;
 use gethostname::gethostname;
 use lazy_static::lazy_static;
+use log::debug;
 use std::path::PathBuf;
 use url::{ParseError, Url};
-use util::dprint;
 
 use crate::{config_share::ConfigShare, share_settings::ShareSettings};
 
@@ -20,10 +20,10 @@ lazy_static! {
 impl ConfigShare {
     /// Initialize config_share, creates the config file, and prompts the user to configure the app.
     pub(crate) fn initialize(&mut self, overwrite: bool, skip_setup: bool) -> anyhow::Result<()> {
-        dprint(format!(
+        debug!(
             "[init.initialize] overwrite={}, skip_setup={}",
             overwrite, skip_setup
-        ));
+        );
 
         self.create_config_file(overwrite)?;
         if !skip_setup {
@@ -64,15 +64,12 @@ impl ConfigShare {
                 .with_initial_text("http://localhost:3000")
                 .interact_text()?;
 
-            dprint(format!("[init.populate_config] input={}", input));
+            debug!("[init.populate_config] input={}", input);
 
             match Url::parse(&input) {
                 Ok(u) => {
                     server_url = u;
-                    dprint(format!(
-                        "[init.populate_config] Setting server_url={}",
-                        server_url
-                    ));
+                    debug!("[init.populate_config] Setting server_url={}", server_url);
                     break;
                 }
                 Err(ParseError::RelativeUrlWithoutBase) => {
@@ -92,10 +89,10 @@ impl ConfigShare {
     }
 
     fn create_config_file(&mut self, overwrite: bool) -> anyhow::Result<()> {
-        dprint(format!(
+        debug!(
             "[init.create_config_file] Using CONFIG_FILE_PATH={}",
             CONFIG_FILE_PATH.to_str().unwrap()
-        ));
+        );
 
         if !overwrite && CONFIG_FILE_PATH.try_exists()? {
             return Err(anyhow!(

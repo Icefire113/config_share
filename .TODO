@@ -6,3 +6,4 @@
 ☐ Stop using `Err` for returning error strings, just make the return type a `Result<Option<String>, anyhow::Error>` when `Some(str)` is the error message (if anys)
 ☐ Fixup the table formatting when listing all tracked files
 ☐ For some reason, `Path.is_file` does not seem to return false when a path is given to it
+☐ Move to using `dunce` for cannonlizing paths

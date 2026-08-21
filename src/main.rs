@@ -2,16 +2,20 @@ use crate::config_share::ConfigShare;
 use anyhow::{Context, anyhow};
 use clap::{Arg, ArgAction, Command, command};
 use console::style;
+use log::debug;
 use std::process::exit;
 use std::result::Result::Ok;
-use util::dprint;
 
 mod config_share;
-mod net;
 mod share_settings;
 mod tracked_file_info;
+mod util;
+
+pub mod api;
 
 fn main() -> anyhow::Result<()> {
+    init_logger();
+
     let mut app = ConfigShare::default();
 
     match run(&mut app) {
@@ -23,12 +27,22 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
+fn init_logger() {
+    let default_level = if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "info"
+    };
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default_level))
+        .init();
+}
+
 fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
     let mut matches = cli();
 
     match matches.get_matches_mut().subcommand() {
         Some(("init", sub_matches)) => {
-            dprint("[main.sub_command] init");
+            debug!("[main.sub_command] init");
 
             app.initialize(
                 sub_matches.get_flag("overwrite"),
@@ -36,7 +50,7 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
             )?;
         }
         Some(("add", sub_matches)) => {
-            dprint("[main.sub_command] add");
+            debug!("[main.sub_command] add");
             app.check_is_config_setup()?;
             app.load_settings()?;
             app.all_startup_checks()?;
@@ -51,7 +65,7 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
             )?;
         }
         Some(("list", _)) => {
-            dprint("[main.sub_command] list");
+            debug!("[main.sub_command] list");
             app.check_is_config_setup()?;
             app.load_settings()?;
             app.all_startup_checks()?;
@@ -59,7 +73,7 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
             app.list_files()?;
         }
         Some(("remove", sub_matches)) => {
-            dprint("[main.sub_command] remove");
+            debug!("[main.sub_command] remove");
             app.check_is_config_setup()?;
             app.load_settings()?;
             app.all_startup_checks()?;
@@ -70,7 +84,7 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
             })?)?;
         }
         Some(("sync", _)) => {
-            dprint("[main.sub_command] sync");
+            debug!("[main.sub_command] sync");
             app.check_is_config_setup()?;
             app.load_settings()?;
             app.all_startup_checks()?;
@@ -78,7 +92,7 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
             app.sync_files()?;
         }
         Some(("check", sub_matches)) => {
-            dprint("[main.sub_command] check");
+            debug!("[main.sub_command] check");
             app.check_is_config_setup()?;
             app.load_settings()?;
             app.all_startup_checks()?;

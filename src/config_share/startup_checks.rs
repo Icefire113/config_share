@@ -1,7 +1,7 @@
 use anyhow::{Context, anyhow};
 use chrono::{TimeDelta, Utc};
 use console::style;
-use util::dprint;
+use log::debug;
 
 use crate::config_share::{ConfigShare, init};
 
@@ -14,7 +14,7 @@ impl ConfigShare {
     }
 
     pub fn check_last_manual_sync(&self) -> anyhow::Result<()> {
-        dprint("[startup_checks.check_last_manual_sync] Checking last manual sync.");
+        debug!("[startup_checks.check_last_manual_sync] Checking last manual sync.");
 
         if self.settings.last_sync.is_none() {
             return self.sync_files();
@@ -40,7 +40,7 @@ impl ConfigShare {
     }
 
     pub fn check_machine_id_blank(&self) -> anyhow::Result<()> {
-        dprint("[startup_checks.check_machine_id] Checking machine id.");
+        debug!("[startup_checks.check_machine_id] Checking machine id.");
         if self.settings.machine_id.trim().is_empty() {
             println!(
                 "{}: The machine id in the config file is currently blank, please change it to something unique",

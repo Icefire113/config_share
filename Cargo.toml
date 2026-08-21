@@ -1,6 +1,26 @@
-[workspace]
-resolver = "3"
-members = [
-    "./crates/config_share",
-    "./crates/util",
-]
+[package]
+name = "config_share"
+version = "0.1.0"
+edition = "2024"
+default-run = "config_share"
+
+[dependencies]
+anyhow = { version = "1.0.103", features = ["backtrace"] }
+api-types = { git = "https://github.com/Icefire113/sync_server.git", version = "0.1.0", features = [
+    "client",
+] }
+chrono = { version = "0.4.44", features = ["serde"] }
+clap = { version = "4.6.0", features = ["cargo"] }
+console = { version = "0.16.3", features = ["windows-console-colors"] }
+dialoguer = { version = "0.12.0", features = ["history"] }
+env_logger = "0.11.11"
+gethostname = "1.1.0"
+lazy_static = "1.5.0"
+log = "0.4.33"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.145" }
+thiserror = "2.0.20"
+twox-hash = "2.1.2"
+ureq = { version = "3.3.0", features = ["json"] }
+url = { version = "2.5.8", features = ["serde"] }
+uuid = { version = "1.23.0", features = ["serde", "v4", "fast-rng"] }
