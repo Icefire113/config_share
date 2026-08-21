@@ -10,6 +10,7 @@ impl ConfigShare {
     pub fn all_startup_checks(&self) -> anyhow::Result<()> {
         // self.check_last_manual_sync()?;
         self.check_machine_id_blank()?;
+        self.check_unsynced_files()?;
         Ok(())
     }
 
@@ -48,6 +49,30 @@ impl ConfigShare {
             );
             return Ok(());
         }
+        Ok(())
+    }
+
+    /// Checks if any of the tracked files have not yet been synced with the server.
+    /// A file is considered unsynced if it has no server-assigned id.
+    pub fn check_unsynced_files(&self) -> anyhow::Result<()> {
+        debug!("[startup_checks.check_unsynced_files] Checking for unsynced files.");
+        let mut unsynced: Vec<String> = Vec::new();
+        for tracked_file in self.settings.tracked_files.iter() {
+            if tracked_file.1.id.is_none() {
+                unsynced.push(tracked_file.0.clone());
+            }
+        }
+
+        if unsynced.is_empty() {
+            return Ok(());
+        }
+
+        println!(
+            "{}: The following tracked files have not yet been synced with the server, run `config_share sync` to push them: {}",
+            style("warning").yellow().bold(),
+            unsynced.join(", "),
+        );
+
         Ok(())
     }
 
