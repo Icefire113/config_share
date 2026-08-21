@@ -3,11 +3,7 @@ use std::path::Path;
 use anyhow::{Context, anyhow};
 use log::debug;
 
-use crate::{
-    config_share::ConfigShare,
-    tracked_file_info::TrackedFile,
-    util::{display_option, get_path_as_string},
-};
+use crate::{config_share::ConfigShare, tracked_file_info::TrackedFile, util::get_path_as_string};
 
 impl ConfigShare {
     pub fn add_file(&mut self, file_path: &String, prompt_for_method: bool) -> anyhow::Result<()> {
@@ -50,6 +46,13 @@ impl ConfigShare {
             }
         }
 
+        // The display name is the custom name if one was chosen, otherwise the file path
+        let name = if custom_name.is_some() {
+            custom_name.clone().unwrap()
+        } else {
+            get_path_as_string(path.as_path())?
+        };
+
         // If we have already added the file to be tracked, don't add it again and inform the user
         if self
             .settings
@@ -58,30 +61,15 @@ impl ConfigShare {
             .any(|e| e.1.file_path == path)
         {
             return Err(anyhow!(
-                "The file {} is already tracked, custom name: {}",
+                "The file {} is already tracked, name: {}",
                 file_path,
-                display_option(
-                    self.settings
-                        .tracked_files
-                        .get(&get_path_as_string(path.as_path())?)
-                        .with_context(|| anyhow!("[config_share.add_file] Failed to get from the hashmap after we just checked if it contains the key, wtf"))
-                        .unwrap()
-                        .use_custom_name
-                        .clone()
-                )
+                name
             ));
         }
 
         self.settings.tracked_files.insert(
-            if custom_name.is_none() {
-                get_path_as_string(path.as_path())?
-            } else {
-                custom_name.clone()
-                    .with_context(
-                        || anyhow!("[config_share.add_file] Failed to get the custom name when the method is not FileName, this is a bug, please report it")
-                    ).unwrap()
-            },
-            TrackedFile::create_from_filepath(path.as_path(), &self.settings.machine_id, custom_name)?,
+            name.clone(),
+            TrackedFile::create_from_filepath(path.as_path(), &self.settings.machine_id, name)?,
         );
         self.save_settings()?;
 

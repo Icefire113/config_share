@@ -13,15 +13,22 @@ use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TrackedFile {
-    pub(crate) id: Uuid,
+    /// The id assigned by the server on first sync, None until then
+    pub(crate) id: Option<Uuid>,
+    /// The display name of the file, used as the key in `tracked_files`
+    pub(crate) name: String,
     /// The path to where the file is stored locally
     pub(crate) file_path: PathBuf,
     // xxhash3 hash of the local file contents
     pub(crate) hash: u64,
+    /// When the local file was last modified
     pub(crate) file_last_modified: DateTime<Utc>,
     /// The last time the file was checked to be up to date with the server
     pub(crate) last_checked: Option<DateTime<Utc>>,
-    pub(crate) use_custom_name: Option<String>,
+    /// The last time a write was performed to the server for this file
+    pub(crate) updated_at: Option<DateTime<Utc>>,
+    /// The machine that last updated the file on the server
+    pub(crate) last_updated_from: Option<String>,
 
     /// A map of machine ids to file paths
     pub(crate) path_per_machine: HashMap<String, PathBuf>,
@@ -31,7 +38,7 @@ impl TrackedFile {
     pub fn create_from_filepath(
         file_path: &Path,
         machine_id: &String,
-        use_custom_name: Option<String>,
+        name: String,
     ) -> anyhow::Result<Self> {
         let mut file = File::open(file_path).with_context(|| {
             anyhow!(
@@ -46,12 +53,14 @@ impl TrackedFile {
         map.insert(machine_id.clone(), file_path.canonicalize()?.to_path_buf());
 
         Ok(Self {
-            id: Uuid::new_v4(),
+            id: None,
+            name,
             file_path: file_path.canonicalize()?.to_path_buf(),
             hash: XxHash3_64::oneshot(&data),
             file_last_modified: file.metadata()?.modified()?.into(),
             last_checked: None,
-            use_custom_name,
+            updated_at: None,
+            last_updated_from: None,
             path_per_machine: map,
         })
     }

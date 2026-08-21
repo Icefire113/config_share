@@ -1,5 +1,4 @@
 use crate::config_share::ConfigShare;
-use crate::util::display_option;
 use anyhow::Ok;
 use console::style;
 
@@ -14,7 +13,7 @@ impl ConfigShare {
             "{: <40} | {: <30} | {: <20}",
             style("File Path").bold(),
             style("Last Modified").bold(),
-            style("Custom Name").bold(),
+            style("Name").bold(),
         );
         println!("{}", style("-".repeat(100)));
 
@@ -23,7 +22,7 @@ impl ConfigShare {
                 "{: <40} | {: <20} | {: <30}",
                 file_info.1.file_path.to_string_lossy(),
                 file_info.1.file_last_modified.to_rfc2822(),
-                display_option(file_info.1.use_custom_name.clone()),
+                file_info.1.name,
             );
         }
 
