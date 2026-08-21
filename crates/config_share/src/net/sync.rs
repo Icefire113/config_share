@@ -5,7 +5,7 @@ use crate::{share_settings::ShareSettings, tracked_file_info::TrackedFile};
 const ENDPOINT_QUERY_DISCRIM: &'static str = "/query_discrim";
 
 /// Check if the hash of the remote file is the same as the hash of the local file,
-/// return `Ok(true)` if they are the same, `Ok(false)`` if they are not.
+/// return `Ok(true)` if they are the same, `Ok(false)` if they are not.
 pub(crate) fn is_remote_hash_same(
     file: &TrackedFile,
     settings: &ShareSettings,

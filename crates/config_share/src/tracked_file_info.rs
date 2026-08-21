@@ -9,9 +9,11 @@ use anyhow::{Context, anyhow};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use twox_hash::XxHash3_64;
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TrackedFile {
+    pub(crate) id: Uuid,
     /// The path to where the file is stored locally
     pub(crate) file_path: PathBuf,
     // xxhash3 hash of the local file contents
@@ -40,10 +42,11 @@ impl TrackedFile {
         file.read_to_end(&mut data)
             .with_context(|| anyhow!("Failed to read the entire file into a buffer"))?;
 
-        let mut map = HashMap::new();
+        let mut map: HashMap<String, PathBuf> = HashMap::new();
         map.insert(machine_id.clone(), file_path.canonicalize()?.to_path_buf());
 
         Ok(Self {
+            id: Uuid::new_v4(),
             file_path: file_path.canonicalize()?.to_path_buf(),
             hash: XxHash3_64::oneshot(&data),
             file_last_modified: file.metadata()?.modified()?.into(),
