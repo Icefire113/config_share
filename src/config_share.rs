@@ -4,12 +4,13 @@ use std::{
     io::{Read, Write},
 };
 
-use crate::share_settings::ShareSettings;
+use crate::{api::ApiClient, share_settings::ShareSettings};
 
 mod add_file;
 mod check_files;
 mod init;
 mod list_files;
+mod ping;
 mod remove;
 mod startup_checks;
 mod sync;
@@ -29,6 +30,15 @@ impl Default for ConfigShare {
 }
 
 impl ConfigShare {
+    pub fn get_api_client(&self) -> anyhow::Result<ApiClient> {
+        Ok(ApiClient::new(
+            self.settings
+                .server_url
+                .clone()
+                .context("Server url is not set")?,
+        ))
+    }
+
     /// Loads the settings from the config file
     pub fn load_settings(&mut self) -> anyhow::Result<()> {
         if !init::CONFIG_FILE_PATH.try_exists()? {

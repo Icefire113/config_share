@@ -1,9 +1,7 @@
 use crate::config_share::ConfigShare;
 use anyhow::{Context, anyhow};
 use clap::{Arg, ArgAction, Command, command};
-use console::style;
-use log::debug;
-use std::process::exit;
+use log::trace;
 use std::result::Result::Ok;
 
 mod config_share;
@@ -17,32 +15,11 @@ fn main() -> anyhow::Result<()> {
     init_logger();
 
     let mut app = ConfigShare::default();
-
-    match run(&mut app) {
-        Ok(_) => anyhow::Ok(()),
-        Err(e) => {
-            eprintln!("{}: {:?}", style("error").red().bold(), e);
-            exit(1);
-        }
-    }
-}
-
-fn init_logger() {
-    let default_level = if cfg!(debug_assertions) {
-        "debug"
-    } else {
-        "info"
-    };
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default_level))
-        .init();
-}
-
-fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
     let mut matches = cli();
 
     match matches.get_matches_mut().subcommand() {
         Some(("init", sub_matches)) => {
-            debug!("[main.sub_command] init");
+            trace!("[main.sub_command] init");
 
             app.initialize(
                 sub_matches.get_flag("overwrite"),
@@ -50,7 +27,7 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
             )?;
         }
         Some(("add", sub_matches)) => {
-            debug!("[main.sub_command] add");
+            trace!("[main.sub_command] add");
             app.check_is_config_setup()?;
             app.load_settings()?;
             app.all_startup_checks()?;
@@ -65,7 +42,7 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
             )?;
         }
         Some(("list", _)) => {
-            debug!("[main.sub_command] list");
+            trace!("[main.sub_command] list");
             app.check_is_config_setup()?;
             app.load_settings()?;
             app.all_startup_checks()?;
@@ -73,7 +50,7 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
             app.list_files()?;
         }
         Some(("remove", sub_matches)) => {
-            debug!("[main.sub_command] remove");
+            trace!("[main.sub_command] remove");
             app.check_is_config_setup()?;
             app.load_settings()?;
             app.all_startup_checks()?;
@@ -84,7 +61,7 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
             })?)?;
         }
         Some(("sync", _)) => {
-            debug!("[main.sub_command] sync");
+            trace!("[main.sub_command] sync");
             app.check_is_config_setup()?;
             app.load_settings()?;
             app.all_startup_checks()?;
@@ -92,12 +69,19 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
             app.sync_files()?;
         }
         Some(("check", sub_matches)) => {
-            debug!("[main.sub_command] check");
+            trace!("[main.sub_command] check");
             app.check_is_config_setup()?;
             app.load_settings()?;
             app.all_startup_checks()?;
 
             app.check_files(sub_matches.get_one::<String>("file"))?;
+        }
+        Some(("ping", _)) => {
+            trace!("[main.sub_command] ping");
+            app.check_is_config_setup()?;
+            app.load_settings()?;
+
+            app.ping_server()?;
         }
         None => {
             // this is still an error, but we should also check if the user has
@@ -109,6 +93,16 @@ fn run(app: &mut ConfigShare) -> anyhow::Result<()> {
         _ => unreachable!("Did you forget to add a subcommand?"),
     };
     Ok(())
+}
+
+fn init_logger() {
+    let default_level = if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "info"
+    };
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default_level))
+        .init();
 }
 
 fn cli() -> Command {
@@ -191,7 +185,13 @@ fn cli() -> Command {
                 .required(false)
                 .help("The file to check, if not specified all files currently tracked will be checked")
             )
-        );
+        )
+        // ping subcommand
+        .subcommand(
+            Command::new("ping")
+            .about("Pings the remote server to check if it is up, and returns the version of the server")
+        )
+        ;
     c.build();
 
     c
