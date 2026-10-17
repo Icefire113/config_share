@@ -28,9 +28,7 @@ fn main() -> anyhow::Result<()> {
         }
         Some(("add", sub_matches)) => {
             trace!("[main.sub_command] add");
-            app.check_is_config_setup()?;
-            app.load_settings()?;
-            app.all_startup_checks()?;
+            prepare_app(&mut app, true)?;
 
             app.add_file(
                 // unwrap is safe here as the subcommand "add" has "file" as a required argument
@@ -43,45 +41,66 @@ fn main() -> anyhow::Result<()> {
         }
         Some(("list", _)) => {
             trace!("[main.sub_command] list");
-            app.check_is_config_setup()?;
-            app.load_settings()?;
-            app.all_startup_checks()?;
+            prepare_app(&mut app, true)?;
 
             app.list_files()?;
         }
         Some(("remove", sub_matches)) => {
             trace!("[main.sub_command] remove");
-            app.check_is_config_setup()?;
-            app.load_settings()?;
-            app.all_startup_checks()?;
+            prepare_app(&mut app, true)?;
 
             app.remove_file(sub_matches.get_one::<String>("file").with_context(|| {
                 // if this ever occurs, it's a bug as we set the argument to be required when creating the subcommand in clap
                 anyhow!("[main.sub_command] remove: Failed to get the file option, this is a bug")
             })?)?;
         }
-        Some(("sync", _)) => {
+        Some(("sync", sub_matches)) => {
             trace!("[main.sub_command] sync");
-            app.check_is_config_setup()?;
-            app.load_settings()?;
-            app.all_startup_checks()?;
+            prepare_app(&mut app, true)?;
 
-            app.sync_files()?;
+            app.sync_files(sub_matches.get_one::<String>("file"))?;
         }
         Some(("check", sub_matches)) => {
             trace!("[main.sub_command] check");
-            app.check_is_config_setup()?;
-            app.load_settings()?;
-            app.all_startup_checks()?;
+            prepare_app(&mut app, true)?;
 
             app.check_files(sub_matches.get_one::<String>("file"))?;
         }
+        Some(("status", sub_matches)) => {
+            trace!("[main.sub_command] status");
+            prepare_app(&mut app, true)?;
+
+            app.status_files(sub_matches.get_one::<String>("file"))?;
+        }
+        Some(("pull", sub_matches)) => {
+            trace!("[main.sub_command] pull");
+            prepare_app(&mut app, true)?;
+
+            app.pull_files(sub_matches.get_one::<String>("file"))?;
+        }
+        Some(("push", sub_matches)) => {
+            trace!("[main.sub_command] push");
+            prepare_app(&mut app, true)?;
+
+            app.push_files(sub_matches.get_one::<String>("file"))?;
+        }
         Some(("ping", _)) => {
             trace!("[main.sub_command] ping");
-            app.check_is_config_setup()?;
-            app.load_settings()?;
+            prepare_app(&mut app, false)?;
 
             app.ping_server()?;
+        }
+        Some(("login", sub_matches)) => {
+            trace!("[main.sub_command] login");
+            prepare_app(&mut app, false)?;
+
+            app.login(sub_matches.get_one::<String>("token").map(|t| t.as_str()))?;
+        }
+        Some(("logout", _)) => {
+            trace!("[main.sub_command] logout");
+            prepare_app(&mut app, false)?;
+
+            app.logout()?;
         }
         None => {
             // this is still an error, but we should also check if the user has
@@ -92,6 +111,18 @@ fn main() -> anyhow::Result<()> {
         }
         _ => unreachable!("Did you forget to add a subcommand?"),
     };
+    Ok(())
+}
+
+/// Checks that the config exists, loads it, and optionally runs the startup checks.
+///
+/// Startup checks are skipped for commands that don't touch tracked files (e.g. `ping`, `login`).
+fn prepare_app(app: &mut ConfigShare, run_startup_checks: bool) -> anyhow::Result<()> {
+    app.check_is_config_setup()?;
+    app.load_settings()?;
+    if run_startup_checks {
+        app.all_startup_checks()?;
+    }
     Ok(())
 }
 
@@ -190,6 +221,52 @@ fn cli() -> Command {
         .subcommand(
             Command::new("ping")
             .about("Pings the remote server to check if it is up, and returns the version of the server")
+        )
+        // status subcommand
+        .subcommand(
+            Command::new("status")
+            .about("Shows the sync status of tracked files (modified locally, up to date, etc.) without syncing")
+            .arg(
+                Arg::new("file")
+                    .required(false)
+                    .help("The file to show the status of, if not specified all files currently tracked will be shown")
+            )
+        )
+        // pull subcommand
+        .subcommand(
+            Command::new("pull")
+            .about("Pulls the remote files down to this machine")
+            .arg(
+                Arg::new("file")
+                    .required(false)
+                    .help("The file to pull, if not specified all files currently tracked will be pulled")
+            )
+        )
+        // push subcommand
+        .subcommand(
+            Command::new("push")
+            .about("Pushes the local files to the server")
+            .arg(
+                Arg::new("file")
+                    .required(false)
+                    .help("The file to push, if not specified all files currently tracked will be pushed")
+            )
+        )
+        // login subcommand
+        .subcommand(
+            Command::new("login")
+            .about("Authenticates with the server and saves the access token")
+            .arg(
+                Arg::new("token")
+                    .long("token")
+                    .value_name("TOKEN")
+                    .help("Uses an existing access token instead of prompting for credentials")
+            )
+        )
+        // logout subcommand
+        .subcommand(
+            Command::new("logout")
+            .about("Revokes the saved access token on the server and removes it locally")
         )
         ;
     c.build();

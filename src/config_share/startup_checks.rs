@@ -18,7 +18,7 @@ impl ConfigShare {
         trace!("[startup_checks.check_last_manual_sync] Checking last manual sync.");
 
         if self.settings.last_sync.is_none() {
-            return self.sync_files();
+            return self.sync_files(None);
         }
 
         let time_since_last_sync = Utc::now()

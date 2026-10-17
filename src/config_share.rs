@@ -7,12 +7,16 @@ use std::{
 use crate::{api::ApiClient, share_settings::ShareSettings};
 
 mod add_file;
+mod auth;
 mod check_files;
 mod init;
 mod list_files;
 mod ping;
+mod pull;
+mod push;
 mod remove;
 mod startup_checks;
+mod status;
 mod sync;
 
 #[derive(Debug)]
