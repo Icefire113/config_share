@@ -20,6 +20,22 @@ pub(crate) struct ShareSettings {
     /// The time in hours before the user is reminded to manually sync
     pub(crate) manual_sync_reminder_time: i64,
     pub(crate) machine_id: String,
+    /// Metadata about the access token stored in the OS keychain, `None` until the
+    /// user logs in. The token itself is never written to the config file.
+    /// Defaulted so that configs created before login existed still load.
+    #[serde(default)]
+    pub(crate) auth: Option<AuthInfo>,
+}
+
+/// Non-secret metadata about the access token stored in the OS keychain.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub(crate) struct AuthInfo {
+    /// The id the server assigned to the token, used to revoke it on logout
+    pub(crate) token_id: i64,
+    /// The name given to the token when it was created
+    pub(crate) name: String,
+    /// When the token expires on the server
+    pub(crate) expires_at: Option<DateTime<Utc>>,
 }
 
 impl Default for ShareSettings {
@@ -32,6 +48,7 @@ impl Default for ShareSettings {
             version: env!("CARGO_PKG_VERSION").to_string(),
             manual_sync_reminder_time: 24 * 7, // 24hrs * 7 = 1 week
             machine_id: "".to_string(),
+            auth: None,
         }
     }
 }

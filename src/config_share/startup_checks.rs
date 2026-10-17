@@ -10,6 +10,7 @@ impl ConfigShare {
     pub fn all_startup_checks(&self) -> anyhow::Result<()> {
         // self.check_last_manual_sync()?;
         self.check_machine_id_blank()?;
+        self.check_logged_in()?;
         self.check_unsynced_files()?;
         Ok(())
     }
@@ -49,6 +50,31 @@ impl ConfigShare {
             );
             return Ok(());
         }
+        Ok(())
+    }
+
+    /// Warns if the user has not logged in yet, or if the saved token has expired.
+    pub fn check_logged_in(&self) -> anyhow::Result<()> {
+        trace!("[startup_checks.check_logged_in] Checking login state.");
+
+        match &self.settings.auth {
+            None => println!(
+                "{}: You are not logged in, run `config_share login` to authenticate with the server",
+                style("warning").yellow().bold()
+            ),
+            Some(auth) => {
+                if let Some(expires_at) = auth.expires_at
+                    && expires_at <= Utc::now()
+                {
+                    println!(
+                        "{}: Your access token expired on {}, run `config_share logout` and then `config_share login` to get a new one",
+                        style("warning").yellow().bold(),
+                        expires_at.to_rfc2822()
+                    );
+                }
+            }
+        }
+
         Ok(())
     }
 

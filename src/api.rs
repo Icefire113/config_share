@@ -20,6 +20,74 @@ use uuid::Uuid;
 
 type ApiResponse = Response<ureq::Body>;
 
+/// Defines [`ApiErrorCode`] from the `E00xx` codes that the server returns.
+///
+/// The server sends the code as a string and `api_types::internal_err::InternalErrorCode`
+/// can't be used directly: it has no `Deserialize`, `Debug` or `PartialEq` impls and
+/// some of its variants carry data, so the codes are mirrored in a local enum instead.
+macro_rules! define_api_error_codes {
+    ($($code:literal => $variant:ident),+ $(,)?) => {
+        #[derive(Debug, Clone, PartialEq, Eq)]
+        pub enum ApiErrorCode {
+            $($variant,)+
+            /// A code that this client does not know about, e.g. from a newer server
+            Unknown(String),
+        }
+
+        impl From<&str> for ApiErrorCode {
+            fn from(code: &str) -> Self {
+                match code {
+                    $($code => Self::$variant,)+
+                    other => Self::Unknown(other.to_string()),
+                }
+            }
+        }
+
+        impl std::fmt::Display for ApiErrorCode {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    $(Self::$variant => f.write_str($code),)+
+                    Self::Unknown(code) => f.write_str(code),
+                }
+            }
+        }
+    };
+}
+
+define_api_error_codes! {
+    "E0001" => NoSuchUserFound,
+    "E0002" => InternalDbError,
+    "E0003" => PasswordHash,
+    "E0004" => UsernameTooShort,
+    "E0005" => UsernameTooLong,
+    "E0006" => FileAlreadyExists,
+    "E0007" => UsernameTaken,
+    "E0008" => Unauthorized,
+    "E0009" => AccountNotEnabled,
+    "E0010" => BadRequest,
+    "E0011" => TokenExpired,
+    "E0012" => TokenRevoked,
+    "E0013" => InternalError,
+    "E0014" => TokenNotFound,
+    "E0015" => Forbidden,
+    "E0016" => CannotRevokeAllTokens,
+    "E0017" => TokenAlreadyRevoked,
+    "E0018" => InvalidUsernameOrPassword,
+    "E0019" => HashPasswordVerify,
+    "E0020" => InsufficientRole,
+    "E0021" => UsernameContainsInvalidChars,
+    "E0022" => JsonRejection,
+    "E0023" => PathRejection,
+    "E0024" => QueryRejection,
+    "E0025" => InvalidTokenPrefix,
+    "E0026" => StorageBackendError,
+    "E0027" => FileNotFound,
+    "E0028" => FileNotInStorage,
+    "E0029" => FileTooLarge,
+    "E0030" => MismatchedFileHash,
+    "E0031" => FileDeleted,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ApiClientError {
     #[error("transport error: {0}")]
@@ -28,10 +96,15 @@ pub enum ApiClientError {
     Io(#[from] std::io::Error),
     #[error("invalid json: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("api error [{status}] {code}: {detail:?}")]
+    /// An error response from the server, `detail` is the server's human readable
+    /// description of the problem when it sends one.
+    #[error(
+        "api error [{status}] {code}{}",
+        detail.as_deref().map(|detail| format!(": {detail}")).unwrap_or_default()
+    )]
     Api {
         status: u16,
-        code: String,
+        code: ApiErrorCode,
         detail: Option<String>,
     },
 }
@@ -102,15 +175,15 @@ impl ApiClient {
     fn parse_error(&self, res: ApiResponse) -> ApiClientError {
         let status = res.status().as_u16();
         let mut body = res.into_body();
-        let err: InternalErrorRes = body.read_json().unwrap_or(InternalErrorRes {
-            code: String::new(),
-            error_detail: None,
-        });
+        let err: Option<InternalErrorRes> = body.read_json().ok();
 
         ApiClientError::Api {
             status,
-            code: err.code,
-            detail: err.error_detail,
+            code: err
+                .as_ref()
+                .map(|err| ApiErrorCode::from(err.code.as_str()))
+                .unwrap_or_else(|| ApiErrorCode::Unknown("unknown".to_string())),
+            detail: err.and_then(|err| err.error_detail),
         }
     }
 }

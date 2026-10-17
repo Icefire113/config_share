@@ -5,7 +5,7 @@ use log::trace;
 use std::path::PathBuf;
 use url::{ParseError, Url};
 
-use crate::{config_share::ConfigShare, share_settings::ShareSettings};
+use crate::{config_share::ConfigShare, share_settings::ShareSettings, token_store};
 
 lazy_static! {
     #[derive(Debug)]
@@ -25,9 +25,23 @@ impl ConfigShare {
             overwrite, skip_setup
         );
 
+        // Overwriting the config forgets the login, so remove the token that was stored
+        // for the old config instead of leaving it behind in the keychain
+        if overwrite
+            && CONFIG_FILE_PATH.try_exists()?
+            && self.load_settings().is_ok()
+            && let Ok(server_url) = self.server_url()
+        {
+            let _ = token_store::delete_token(&server_url);
+        }
+
         self.create_config_file(overwrite)?;
         if !skip_setup {
             self.populate_config()?;
+        }
+
+        if self.settings.auth.is_none() {
+            println!("Run `config_share login` to authenticate with the server");
         }
 
         Ok(())

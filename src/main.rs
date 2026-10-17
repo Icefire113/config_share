@@ -6,6 +6,7 @@ use std::result::Result::Ok;
 
 mod config_share;
 mod share_settings;
+mod token_store;
 mod tracked_file_info;
 mod util;
 
@@ -133,6 +134,8 @@ fn init_logger() {
         "info"
     };
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default_level))
+        // keyring logs every keychain access at debug level, which is just noise
+        .filter_module("keyring_core", log::LevelFilter::Info)
         .init();
 }
 

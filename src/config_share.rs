@@ -3,8 +3,9 @@ use std::{
     fs::File,
     io::{Read, Write},
 };
+use url::Url;
 
-use crate::{api::ApiClient, share_settings::ShareSettings};
+use crate::{api::ApiClient, share_settings::ShareSettings, token_store};
 
 mod add_file;
 mod auth;
@@ -34,13 +35,38 @@ impl Default for ConfigShare {
 }
 
 impl ConfigShare {
+    /// The url of the server that is configured to be synced with.
+    pub(crate) fn server_url(&self) -> anyhow::Result<Url> {
+        self.settings
+            .server_url
+            .clone()
+            .context("Server url is not set")
+    }
+
+    /// Creates an API client for the configured server without any authentication,
+    /// used for the endpoints that don't need a token (e.g. logging in).
+    pub fn get_unauthenticated_api_client(&self) -> anyhow::Result<ApiClient> {
+        Ok(ApiClient::new(self.server_url()?))
+    }
+
+    /// Creates an API client for the configured server, authenticated with the token
+    /// stored in the OS keychain if the user has logged in.
     pub fn get_api_client(&self) -> anyhow::Result<ApiClient> {
-        Ok(ApiClient::new(
-            self.settings
-                .server_url
-                .clone()
-                .context("Server url is not set")?,
-        ))
+        let server_url = self.server_url()?;
+        let client = ApiClient::new(server_url.clone());
+
+        match &self.settings.auth {
+            Some(_) => {
+                let token = token_store::load_token(&server_url)?.with_context(|| {
+                    anyhow!(
+                        "No access token found in the OS keychain for {}, run `config_share login` again",
+                        server_url
+                    )
+                })?;
+                Ok(client.with_token(token))
+            }
+            None => Ok(client),
+        }
     }
 
     /// Loads the settings from the config file
