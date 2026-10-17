@@ -4,7 +4,7 @@ use api_types::{
     create_file::{CreateFileReq, CreateFileRes},
     create_token::{CreateTokenReq, CreateTokenRes},
     create_user::{CreateUserReq, CreateUserRes},
-    get_file::{GetFileContentRes, GetFileInfoRes},
+    get_file::{GetAllFilesReq, GetAllFilesRes, GetFileContentRes, GetFileInfoRes},
     get_token_info::{GetTokenInfoReq, GetTokenInfoRes},
     get_user::GetUserRes,
     internal_err::InternalErrorRes,
@@ -133,6 +133,17 @@ impl ApiClient {
 
 // Files
 impl ApiClient {
+    /// GET /api/files lists all tracked files for the authenticated user.
+    pub fn get_all_files(&self, req: &GetAllFilesReq) -> Result<GetAllFilesRes, ApiClientError> {
+        let res = self
+            .apply_auth(self.agent.get(self.url("/api/files")))
+            .query("include_deleted", req.include_deleted.to_string())
+            .query("limit", req.limit.unwrap_or(100).to_string())
+            .query("offset", req.offset.unwrap_or(0).to_string())
+            .call()?;
+        self.parse(res, 200)
+    }
+
     /// POST /api/files uploads a new tracked file.
     pub fn create_file(&self, req: &CreateFileReq) -> Result<CreateFileRes, ApiClientError> {
         let res = self
