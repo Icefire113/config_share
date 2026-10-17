@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use anyhow::{Context, anyhow};
-use log::debug;
+use log::trace;
 
 use crate::{
     config_share::ConfigShare,
@@ -11,7 +11,7 @@ use crate::{
 
 impl ConfigShare {
     pub fn check_files(&self, file: Option<&String>) -> anyhow::Result<()> {
-        debug!(
+        trace!(
             "[config_share.check_files] Checking file {}",
             display_option(file)
         );

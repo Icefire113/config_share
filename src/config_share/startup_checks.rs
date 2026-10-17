@@ -1,7 +1,7 @@
 use anyhow::{Context, anyhow};
 use chrono::{TimeDelta, Utc};
 use console::style;
-use log::debug;
+use log::trace;
 
 use crate::config_share::{ConfigShare, init};
 
@@ -15,7 +15,7 @@ impl ConfigShare {
     }
 
     pub fn check_last_manual_sync(&self) -> anyhow::Result<()> {
-        debug!("[startup_checks.check_last_manual_sync] Checking last manual sync.");
+        trace!("[startup_checks.check_last_manual_sync] Checking last manual sync.");
 
         if self.settings.last_sync.is_none() {
             return self.sync_files();
@@ -41,7 +41,7 @@ impl ConfigShare {
     }
 
     pub fn check_machine_id_blank(&self) -> anyhow::Result<()> {
-        debug!("[startup_checks.check_machine_id] Checking machine id.");
+        trace!("[startup_checks.check_machine_id] Checking machine id.");
         if self.settings.machine_id.trim().is_empty() {
             println!(
                 "{}: The machine id in the config file is currently blank, please change it to something unique",
@@ -55,7 +55,7 @@ impl ConfigShare {
     /// Checks if any of the tracked files have not yet been synced with the server.
     /// A file is considered unsynced if it has no server-assigned id.
     pub fn check_unsynced_files(&self) -> anyhow::Result<()> {
-        debug!("[startup_checks.check_unsynced_files] Checking for unsynced files.");
+        trace!("[startup_checks.check_unsynced_files] Checking for unsynced files.");
         let mut unsynced: Vec<String> = Vec::new();
         for tracked_file in self.settings.tracked_files.iter() {
             if tracked_file.1.id.is_none() {

@@ -3,11 +3,11 @@ use std::path::Path;
 use crate::config_share::ConfigShare;
 use crate::util::{get_path_as_string, get_pathbuf_as_string};
 use anyhow::{Context, Ok, anyhow};
-use log::debug;
+use log::trace;
 
 impl ConfigShare {
     pub fn remove_file(&mut self, file_path: &String) -> anyhow::Result<()> {
-        debug!(
+        trace!(
             "[config_share.remove] Attempting to remove file: {}",
             file_path
         );

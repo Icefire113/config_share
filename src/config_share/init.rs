@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use gethostname::gethostname;
 use lazy_static::lazy_static;
-use log::debug;
+use log::trace;
 use std::path::PathBuf;
 use url::{ParseError, Url};
 
@@ -20,7 +20,7 @@ lazy_static! {
 impl ConfigShare {
     /// Initialize config_share, creates the config file, and prompts the user to configure the app.
     pub(crate) fn initialize(&mut self, overwrite: bool, skip_setup: bool) -> anyhow::Result<()> {
-        debug!(
+        trace!(
             "[init.initialize] overwrite={}, skip_setup={}",
             overwrite, skip_setup
         );
@@ -64,12 +64,12 @@ impl ConfigShare {
                 .with_initial_text("http://localhost:3000")
                 .interact_text()?;
 
-            debug!("[init.populate_config] input={}", input);
+            trace!("[init.populate_config] input={}", input);
 
             match Url::parse(&input) {
                 Ok(u) => {
                     server_url = u;
-                    debug!("[init.populate_config] Setting server_url={}", server_url);
+                    trace!("[init.populate_config] Setting server_url={}", server_url);
                     break;
                 }
                 Err(ParseError::RelativeUrlWithoutBase) => {
@@ -89,7 +89,7 @@ impl ConfigShare {
     }
 
     fn create_config_file(&mut self, overwrite: bool) -> anyhow::Result<()> {
-        debug!(
+        trace!(
             "[init.create_config_file] Using CONFIG_FILE_PATH={}",
             CONFIG_FILE_PATH.to_str().unwrap()
         );

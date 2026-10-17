@@ -1,13 +1,13 @@
 use std::path::Path;
 
 use anyhow::{Context, anyhow};
-use log::debug;
+use log::trace;
 
 use crate::{config_share::ConfigShare, tracked_file_info::TrackedFile, util::get_path_as_string};
 
 impl ConfigShare {
     pub fn add_file(&mut self, file_path: &String, prompt_for_method: bool) -> anyhow::Result<()> {
-        debug!("[add_file.add_file] Adding file: {}", file_path);
+        trace!("[add_file.add_file] Adding file: {}", file_path);
         let path = Path::new(file_path).canonicalize().with_context(
                 || anyhow!("[config_share.add_file] Failed to get the canonicalized path and convert it to a string, does the file path contain invalid UTF-8?")
             )?;
@@ -41,7 +41,7 @@ impl ConfigShare {
                     )
                     .interact()?;
 
-                debug!("[config_share.add_file] Using custom_name = {}", name);
+                trace!("[config_share.add_file] Using custom_name = {}", name);
                 custom_name = Some(name);
             }
         }
