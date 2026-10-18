@@ -148,6 +148,7 @@ fn init_logger() {
         // keyring logs every keychain access at debug level, which is just noise
         .filter_module("keyring_core", log::LevelFilter::Info)
         .filter_module("ureq", log::LevelFilter::Info)
+        .filter_module("rustls", log::LevelFilter::Info)
         .init();
 }
 
