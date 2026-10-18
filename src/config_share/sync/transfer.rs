@@ -69,8 +69,11 @@ impl ConfigShare {
         let bytes = client
             .get_file_contents(&id)
             .with_context(|| format!("Failed to download {}", tracked.name))?;
+        let plaintext = self
+            .decode_download(&bytes)
+            .with_context(|| format!("Failed to read the server copy of {}", tracked.name))?;
         let hash = {
-            let bytes: &[u8] = &bytes;
+            let bytes: &[u8] = &plaintext;
             XxHash3_64::oneshot(bytes)
         };
 
@@ -101,7 +104,7 @@ impl ConfigShare {
             );
         }
 
-        write_file_atomic(&tracked.file_path, &bytes)
+        write_file_atomic(&tracked.file_path, &plaintext)
             .with_context(|| format!("Failed to write {}", tracked.file_path.display()))?;
 
         let now = Utc::now();
@@ -128,17 +131,21 @@ impl ConfigShare {
         &mut self,
         client: &ApiClient,
         name: &str,
-        bytes: &[u8],
+        plaintext: &[u8],
         hash: u64,
     ) -> anyhow::Result<()> {
         let tracked = self.tracked(name)?;
         let machine_id = self.settings.machine_id.clone();
 
+        // The server stores and hands back the bytes as-is; the hash is computed
+        // over the plaintext by us, the server never hashes the contents itself.
+        let file_bytes = self.encode_for_upload(plaintext)?.encode();
+
         let res = client
             .create_file(&CreateFileReq {
                 name: tracked.name.clone(),
                 hash,
-                file_bytes: bytes.to_vec(),
+                file_bytes,
                 machine_name: machine_id.clone(),
             })
             .with_context(|| format!("Failed to upload {}", tracked.name))?;
@@ -166,11 +173,15 @@ impl ConfigShare {
         name: &str,
         id: &Uuid,
         expected_hash: u64,
-        bytes: &[u8],
+        plaintext: &[u8],
         hash: u64,
     ) -> anyhow::Result<()> {
         let tracked = self.tracked(name)?;
         let machine_id = self.settings.machine_id.clone();
+
+        // The hash stays the plaintext hash, even when the uploaded bytes are
+        // encrypted, so the three-way sync logic still compares like with like.
+        let file_bytes = self.encode_for_upload(plaintext)?.encode();
 
         let res = match client.update_file(
             id,
@@ -178,7 +189,7 @@ impl ConfigShare {
                 name: None,
                 machine_name: machine_id,
                 update_contents: Some(UpdateContents {
-                    file_bytes: bytes.to_vec(),
+                    file_bytes,
                     expected_hash,
                     hash,
                 }),

@@ -94,6 +94,9 @@ impl ConfigShare {
         let remote = client
             .get_file_contents(&id)
             .with_context(|| format!("Failed to download {}", tracked.name))?;
+        let remote = self
+            .decode_download(&remote)
+            .with_context(|| format!("Failed to read the server copy of {}", tracked.name))?;
 
         print_diff(&tracked.file_path, &local, &remote);
         Ok(())
@@ -123,6 +126,9 @@ impl ConfigShare {
         let remote = client
             .get_file_contents(&id)
             .with_context(|| format!("Failed to download {}", tracked.name))?;
+        let remote = self
+            .decode_download(&remote)
+            .with_context(|| format!("Failed to read the server copy of {}", tracked.name))?;
 
         write_file_atomic(&sidecar, &remote)
             .with_context(|| format!("Failed to write {}", sidecar.display()))?;

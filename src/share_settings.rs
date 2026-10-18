@@ -28,6 +28,19 @@ pub(crate) struct ShareSettings {
     /// Remote files that the user chose not to track on this machine
     #[serde(default)]
     pub(crate) ignored_remote_files: HashSet<Uuid>,
+    /// Enables client-side encryption for files uploaded from this machine.
+    /// `None` means uploads are wrapped as plaintext. The passphrase itself is
+    /// kept in the OS keychain and never written to the config file.
+    #[serde(default)]
+    pub(crate) encryption: Option<EncryptionSettings>,
+}
+
+/// Non-secret settings needed to encrypt new uploads on this machine.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub(crate) struct EncryptionSettings {
+    /// Base64-encoded Argon2 salt. It is embedded in every encrypted upload, so
+    /// other machines with the same passphrase can decrypt files uploaded here.
+    pub(crate) salt: String,
 }
 
 /// Non-secret metadata about the access token stored in the OS keychain.
@@ -53,6 +66,7 @@ impl Default for ShareSettings {
             machine_id: "".to_string(),
             auth: None,
             ignored_remote_files: HashSet::new(),
+            encryption: None,
         }
     }
 }

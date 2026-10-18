@@ -9,8 +9,10 @@ use crate::{
 impl ConfigShare {
     /// Pulls the tracked files down from the server, overwriting the local copies.
     ///
-    /// Unlike `sync`, this never prompts: every tracked file that exists on the
-    /// server is downloaded, including files that have local changes.
+    /// Unlike `sync`, this never asks what to do: every tracked file that exists on
+    /// the server is downloaded, including files that have local changes.
+    ///
+    /// It can still ask for the encryption passphrase if it is not cached.
     pub fn pull_files(&mut self, file: Option<&String>) -> anyhow::Result<()> {
         self.require_sync_ready()?;
 

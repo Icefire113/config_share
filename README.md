@@ -11,8 +11,12 @@ automatic where it is safe.
   `sync`, so it can tell "I changed it" from "another machine changed it".
 - **Server is authoritative for identity**: files are matched by server id, not
   by path or name.
-- **No secrets in the config file**: the access token lives in the OS keychain
-  (Windows Credential Manager, macOS Keychain, or Secret Service on Linux).
+- **No secrets in the config file**: the access token and the encryption
+  passphrase live in the OS keychain (Windows Credential Manager, macOS Keychain,
+  or Secret Service on Linux).
+- **Client-side encryption**: with `config_share encrypt`, new uploads are
+  encrypted with XChaCha20-Poly1305 before they leave the machine, so the server
+  only receives ciphertext.
 - **Safe writes**: downloads are hash-verified, then written to a temp file and
   renamed into place. Existing permissions are preserved; new files are created
   `0600` on Unix.
@@ -42,6 +46,7 @@ Or build without installing and use `./target/release/config_share`.
 ```sh
 config_share init            # pick a server URL and a machine name
 config_share login           # username/password, token is stored in the keychain
+config_share encrypt         # pick an encryption passphrase (optional but recommended)
 config_share add ~/.gitconfig
 config_share sync
 ```
@@ -51,13 +56,15 @@ On another machine:
 ```sh
 config_share init
 config_share login
+config_share encrypt         # enter the same passphrase as on the first machine
 config_share sync            # offers to download the tracked files
 ```
 
 `init` writes `~/.config/config_share/config.json` on every platform (on Windows
 that is `C:\Users\<you>\.config\config_share\config.json`). It always asks for
 the server URL and machine name; `init --overwrite` resets the config and forgets
-the locally saved token for the old server (it is not revoked on the server).
+the locally saved token and encryption passphrase for the old server (neither is
+revoked or deleted on the server).
 
 ## Commands
 
@@ -66,6 +73,7 @@ the locally saved token for the old server (it is not revoked on the server).
 | `init [--overwrite]`                                  | Create or reset the config file and prompt for server + machine id              |
 | `login [--token <TOKEN>]`                             | Request a token with credentials, or save an existing token                     |
 | `logout [--force]`                                    | Revoke the token on the server and forget it; `--force` only forgets it locally |
+| `encrypt [--forget] [--disable]`                      | Set up client-side encryption; `--forget` clears the cached passphrase, `--disable` stops encrypting new uploads |
 | `add [--use-path] <file>`                             | Start tracking a file; prompts for a naming method unless `--use-path`          |
 | `remove [--remote] <file>`                            | Stop tracking a file; `--remote` also deletes the server copy                   |
 | `list`                                                | Show tracked files, paths, and last-modified times (local time)                 |
@@ -73,7 +81,7 @@ the locally saved token for the old server (it is not revoked on the server).
 | `status [--include-ignored] [file]`                   | Show the sync state without changing anything                                   |
 | `check [file]`                                        | Offline: re-hash local files and compare them with the saved anchor             |
 | `pull [file]`                                         | Force-download tracked files (refuses to overwrite unsynced local changes)      |
-| `push [file]`                                         | Force-upload tracked files (overwrites the server copies)                       |
+| `push [--force] [file]`                               | Force-upload tracked files (overwrites the server copies); `--force` also re-uploads up-to-date files |
 | `ping`                                                | Print the server version                                                        |
 
 All commands that take `[file]` accept a local path.
@@ -110,9 +118,51 @@ config and hides it from future runs. Use `sync --include-ignored` or
 `status --include-ignored` to see those files again; downloading one removes it
 from the ignored list.
 
+## Encryption
+
+`config_share encrypt` enables client-side encryption for files uploaded from
+this machine. It prompts for a passphrase, derives a key with Argon2id and saves
+the passphrase in the OS keychain, so normal syncs do not prompt. Uploads are
+encrypted with XChaCha20-Poly1305 before they are sent; the server only ever
+stores ciphertext.
+
+- **Use the same passphrase on every machine.** Run `config_share encrypt` once on
+  each machine. Nothing else has to be copied: every encrypted payload carries
+  the random Argon2 salt it was created with.
+- **No recovery.** If the passphrase is lost, the encrypted files on the server
+  cannot be read again. The server cannot help, because it never has the key.
+- **Changing the passphrase** makes files uploaded with the previous passphrase
+  unreadable.
+- **Existing files are not re-uploaded automatically.** Enabling encryption only
+  affects future uploads. Run `config_share push --force` to encrypt the files
+  that are already on the server.
+- `encrypt --forget` removes the cached passphrase from the keychain; the next
+  operation prompts for it again. `encrypt --disable` stops encrypting new
+  uploads, but files already encrypted on the server stay encrypted and still
+  need the passphrase to download.
+
+### Storage format
+
+Every upload is wrapped in a small versioned envelope:
+
+```text
+plaintext:  "CSHARE01" | kind=0 | raw contents
+encrypted:  "CSHARE01" | kind=1 | version | kdf | salt (16) | nonce (24) | ciphertext + tag
+```
+
+The `hash` in the manifest is always the xxhash3 of the local **plaintext**,
+computed by the client. The server stores that value and never hashes the bytes
+itself, so the three-way sync can keep comparing like with like even though the
+stored bytes are encrypted.
+
+The envelope format is a breaking change: files uploaded by an older version
+have no header and are rejected on download. Re-upload them with
+`config_share push --force` from a machine that still has the local copy.
+
 ## How it works
 
-- File contents are compared with xxhash3 (64bit). The server stores the same hash.
+- File contents are compared with xxhash3 (64bit) of the plaintext. The server
+  stores the same hash; the client computes it, the server never does.
 - `TrackedFile.synced_hash` is the hash both sides had after the last successful
   sync. `check` compares the current local hash with it, which is why `check`
   works offline.
@@ -143,6 +193,9 @@ from the ignored list.
   },
   "last_sync": "2026-10-18T07:00:00Z",
   "manual_sync_reminder_time": 168,
+  "encryption": {
+    "salt": "…base64…"
+  },
   "auth": {
     "token_id": 1,
     "name": "desktop",
@@ -153,12 +206,18 @@ from the ignored list.
 ```
 
 The token itself is **not** in this file; `auth` only keeps the metadata needed to
-revoke it. `manual_sync_reminder_time` is in hours and controls the "it has been a
-while" warning shown by most commands.
+revoke it. The encryption passphrase is not in this file either: `encryption`
+only stores the non-secret Argon2 salt used for files uploaded from this machine.
+`manual_sync_reminder_time` is in hours and controls the "it has been a while"
+warning shown by most commands.
 
 ## Notes and limitations
 
 - File permissions are not synced yet.
+- The encryption passphrase cannot be recovered. Losing it means the encrypted
+  files on the server cannot be decrypted.
+- `push --force` is required to encrypt files that were already on the server
+  before encryption was enabled.
 - `remove` is local-only unless `--remote` is passed.
 - There is no automatic three-way text merge; use the diff and `.remote` sidecar.
 - `pull` deliberately refuses to overwrite local files that have unsynced changes;

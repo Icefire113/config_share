@@ -1,16 +1,26 @@
 use anyhow::{Context, anyhow};
 use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fmt,
     fs::{File, create_dir_all},
     io::{Read, Write},
     path::Path,
 };
 use url::Url;
+use zeroize::Zeroizing;
 
-use crate::{api::ApiClient, share_settings::ShareSettings, token_store};
+use crate::{
+    api::ApiClient,
+    crypto::{EncryptionKey, SALT_LEN},
+    secret_store,
+    share_settings::ShareSettings,
+};
 
 mod add_file;
 mod auth;
 mod check_files;
+pub(crate) mod encryption;
 mod init;
 mod list_files;
 mod ping;
@@ -21,9 +31,23 @@ mod startup_checks;
 mod status;
 mod sync;
 
-#[derive(Debug)]
+pub(crate) use encryption::EncryptionAction;
+
 pub struct ConfigShare {
     settings: ShareSettings,
+    /// The encryption passphrase for this run, so a multi-file operation prompts
+    /// at most once. It is never written to the config file or debug output.
+    passphrase: RefCell<Option<Zeroizing<String>>>,
+    /// Derived encryption keys for this run, keyed by the salt in each payload.
+    keys: RefCell<HashMap<[u8; SALT_LEN], EncryptionKey>>,
+}
+
+impl fmt::Debug for ConfigShare {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ConfigShare")
+            .field("settings", &self.settings)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Default for ConfigShare {
@@ -31,6 +55,8 @@ impl Default for ConfigShare {
     fn default() -> Self {
         Self {
             settings: ShareSettings::default(),
+            passphrase: RefCell::new(None),
+            keys: RefCell::new(HashMap::new()),
         }
     }
 }
@@ -58,7 +84,7 @@ impl ConfigShare {
 
         match &self.settings.auth {
             Some(_) => {
-                let token = token_store::load_token(&server_url)?.with_context(|| {
+                let token = secret_store::load_token(&server_url)?.with_context(|| {
                     anyhow!(
                         "No access token found in the OS keychain for {}, run `config_share login` again",
                         server_url

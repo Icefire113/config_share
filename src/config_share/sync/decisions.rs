@@ -361,8 +361,11 @@ impl ConfigShare {
                 let bytes = client
                     .get_file_contents(&id)
                     .with_context(|| format!("Failed to download {}", remote_file.name))?;
+                let plaintext = self.decode_download(&bytes).with_context(|| {
+                    format!("Failed to read the server copy of {}", remote_file.name)
+                })?;
                 let hash = {
-                    let bytes: &[u8] = &bytes;
+                    let bytes: &[u8] = &plaintext;
                     XxHash3_64::oneshot(bytes)
                 };
 
@@ -370,7 +373,7 @@ impl ConfigShare {
                     bail!("The server copy changed while syncing, run the sync again");
                 }
 
-                write_file_atomic(&path, &bytes)
+                write_file_atomic(&path, &plaintext)
                     .with_context(|| format!("Failed to write {}", path.display()))?;
 
                 let local_name = self.unique_local_name(&remote_file.name);

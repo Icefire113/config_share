@@ -9,9 +9,13 @@ use crate::{
 impl ConfigShare {
     /// Pushes the tracked files up to the server, overwriting the remote copies.
     ///
-    /// Unlike `sync`, this never prompts: every tracked file that exists locally is
-    /// uploaded, including files that have remote changes.
-    pub fn push_files(&mut self, file: Option<&String>) -> anyhow::Result<()> {
+    /// Unlike `sync`, this never asks what to do: every tracked file that exists
+    /// locally is uploaded, including files that have remote changes. With `force`,
+    /// files that are already up to date are uploaded as well, which is how
+    /// existing files are moved over to encryption after `config_share encrypt`.
+    ///
+    /// It can still ask for the encryption passphrase if it is not cached.
+    pub fn push_files(&mut self, file: Option<&String>, force: bool) -> anyhow::Result<()> {
         self.require_sync_ready()?;
 
         let client = self.get_api_client()?;
@@ -36,8 +40,12 @@ impl ConfigShare {
 
             match plan.status {
                 SyncStatus::UpToDate => {
-                    unchanged += 1;
-                    continue;
+                    // Re-uploading an up-to-date file is only useful when forcing,
+                    // e.g. to encrypt a file that was uploaded as plaintext before
+                    if !force {
+                        unchanged += 1;
+                        continue;
+                    }
                 }
                 SyncStatus::LocalMissing | SyncStatus::BothMissing => {
                     println!(

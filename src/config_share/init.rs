@@ -5,7 +5,7 @@ use log::trace;
 use std::path::PathBuf;
 use url::Url;
 
-use crate::{config_share::ConfigShare, share_settings::ShareSettings, token_store};
+use crate::{config_share::ConfigShare, secret_store, share_settings::ShareSettings};
 
 lazy_static! {
     #[derive(Debug)]
@@ -29,7 +29,8 @@ impl ConfigShare {
             && self.load_settings().is_ok()
             && let Ok(server_url) = self.server_url()
         {
-            let _ = token_store::delete_token(&server_url);
+            let _ = secret_store::delete_token(&server_url);
+            let _ = secret_store::delete_encryption_passphrase(&server_url);
         }
 
         self.create_config_file(overwrite)?;
@@ -38,6 +39,7 @@ impl ConfigShare {
         if self.settings.auth.is_none() {
             println!("Run `config_share login` to authenticate with the server");
         }
+        println!("Run `config_share encrypt` to encrypt files before they are uploaded");
 
         Ok(())
     }

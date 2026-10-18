@@ -1,13 +1,16 @@
 use crate::config_share::ConfigShare;
+use crate::config_share::EncryptionAction;
 use anyhow::{Context, anyhow};
 use clap::{Arg, ArgAction, Command, command};
 use log::trace;
 use std::result::Result::Ok;
 
 mod config_share;
+mod crypto;
+mod file_content;
+mod secret_store;
 mod share_settings;
 mod sync_analysis;
-mod token_store;
 mod tracked_file_info;
 mod util;
 
@@ -94,7 +97,10 @@ fn main() -> anyhow::Result<()> {
             trace!("[main.sub_command] push");
             prepare_app(&mut app, true)?;
 
-            app.push_files(sub_matches.get_one::<String>("file"))?;
+            app.push_files(
+                sub_matches.get_one::<String>("file"),
+                sub_matches.get_flag("force"),
+            )?;
         }
         Some(("ping", _)) => {
             trace!("[main.sub_command] ping");
@@ -107,6 +113,20 @@ fn main() -> anyhow::Result<()> {
             prepare_app(&mut app, false)?;
 
             app.login(sub_matches.get_one::<String>("token").map(|t| t.as_str()))?;
+        }
+        Some(("encrypt", sub_matches)) => {
+            trace!("[main.sub_command] encrypt");
+            prepare_app(&mut app, false)?;
+
+            let action = if sub_matches.get_flag("forget") {
+                EncryptionAction::Forget
+            } else if sub_matches.get_flag("disable") {
+                EncryptionAction::Disable
+            } else {
+                EncryptionAction::Setup
+            };
+
+            app.configure_encryption(action)?;
         }
         Some(("logout", sub_matches)) => {
             trace!("[main.sub_command] logout");
@@ -291,6 +311,12 @@ fn cli() -> Command {
                     .required(false)
                     .help("The file to push, if not specified all files currently tracked will be pushed")
             )
+            .arg(
+                Arg::new("force")
+                    .long("force")
+                    .action(ArgAction::SetTrue)
+                    .help("Also uploads files that are already up to date (useful to encrypt existing files)")
+            )
         )
         // login subcommand
         .subcommand(
@@ -312,6 +338,24 @@ fn cli() -> Command {
                     .long("force")
                     .action(ArgAction::SetTrue)
                     .help("Removes the token from this machine without revoking it on the server")
+            )
+        )
+        // encrypt subcommand
+        .subcommand(
+            Command::new("encrypt")
+            .about("Sets up client-side encryption for the files uploaded to the server")
+            .arg(
+                Arg::new("forget")
+                    .long("forget")
+                    .action(ArgAction::SetTrue)
+                    .conflicts_with("disable")
+                    .help("Removes the cached passphrase from the OS keychain, keeping encryption enabled")
+            )
+            .arg(
+                Arg::new("disable")
+                    .long("disable")
+                    .action(ArgAction::SetTrue)
+                    .help("Stops encrypting new uploads and removes the cached passphrase")
             )
         )
         ;

@@ -11,8 +11,8 @@ use log::trace;
 use crate::{
     api::{ApiClient, ApiClientError, ApiErrorCode},
     config_share::ConfigShare,
+    secret_store,
     share_settings::AuthInfo,
-    token_store,
     util::format_local_time,
 };
 
@@ -28,7 +28,7 @@ impl ConfigShare {
         );
 
         let server_url = self.server_url()?;
-        let stored_token = token_store::load_token(&server_url)?;
+        let stored_token = secret_store::load_token(&server_url)?;
 
         // An expired token is useless, so let the user log in again without having to
         // log out first (which would fail to revoke the expired token on the server).
@@ -60,12 +60,12 @@ impl ConfigShare {
         let token_name = auth.name.clone();
         let expires_at = auth.expires_at;
 
-        token_store::save_token(&server_url, &token)?;
+        secret_store::save_token(&server_url, &token)?;
         self.settings.auth = Some(auth);
 
         // Don't leave a token in the keychain that the config file doesn't know about
         if let Err(e) = self.save_settings() {
-            let _ = token_store::delete_token(&server_url);
+            let _ = secret_store::delete_token(&server_url);
             return Err(e);
         }
 
@@ -92,10 +92,10 @@ impl ConfigShare {
         let server_url = self.server_url()?;
 
         if force {
-            let removed = token_store::load_token(&server_url)?.is_some();
+            let removed = secret_store::load_token(&server_url)?.is_some();
             let had_login = self.settings.auth.is_some() || removed;
 
-            token_store::delete_token(&server_url)?;
+            secret_store::delete_token(&server_url)?;
             self.settings.auth = None;
             self.save_settings()?;
 
@@ -114,8 +114,8 @@ impl ConfigShare {
 
         let Some(auth) = self.settings.auth.clone() else {
             // There is no login metadata, but a token may still be left in the keychain
-            if token_store::load_token(&server_url)?.is_some() {
-                token_store::delete_token(&server_url)?;
+            if secret_store::load_token(&server_url)?.is_some() {
+                secret_store::delete_token(&server_url)?;
                 println!(
                     "{}",
                     style("Removed a leftover token from the OS keychain.").green()
@@ -126,7 +126,7 @@ impl ConfigShare {
             return Ok(());
         };
 
-        match token_store::load_token(&server_url)? {
+        match secret_store::load_token(&server_url)? {
             Some(token) => {
                 let client = ApiClient::new(server_url.clone()).with_token(token);
 
@@ -182,7 +182,7 @@ impl ConfigShare {
             }
         }
 
-        token_store::delete_token(&server_url)?;
+        secret_store::delete_token(&server_url)?;
         self.settings.auth = None;
         self.save_settings()?;
         println!("{}", style("Logged out.").green());
