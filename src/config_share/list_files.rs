@@ -13,8 +13,11 @@ impl ConfigShare {
 
         #[derive(Tabled)]
         struct Record<'a> {
+            #[tabled(rename = "Local Path")]
             path: Cow<'a, str>,
+            #[tabled(rename = "Last Modified")]
             last_modified: String,
+            #[tabled(rename = "Name")]
             name: &'a str,
         }
 
