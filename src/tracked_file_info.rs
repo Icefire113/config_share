@@ -1,17 +1,15 @@
 use std::{
     collections::HashMap,
     fs::File,
-    io::Read,
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, anyhow};
+use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use twox_hash::XxHash3_64;
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TrackedFile {
     /// The id assigned by the server on first sync, None until then
     pub(crate) id: Option<Uuid>,
@@ -19,8 +17,11 @@ pub struct TrackedFile {
     pub(crate) name: String,
     /// The path to where the file is stored locally
     pub(crate) file_path: PathBuf,
-    // xxhash3 hash of the local file contents
-    pub(crate) hash: u64,
+    /// The hash that both the local file and the server copy had at the last
+    /// successful sync. None if the file has never been synced, or if the config
+    /// was written before sync tracked this.
+    #[serde(default)]
+    pub(crate) synced_hash: Option<u64>,
     /// When the local file was last modified
     pub(crate) file_last_modified: DateTime<Utc>,
     /// The last time the file was checked to be up to date with the server
@@ -37,32 +38,29 @@ pub struct TrackedFile {
 impl TrackedFile {
     pub fn create_from_filepath(
         file_path: &Path,
-        machine_id: &String,
+        machine_id: &str,
         name: String,
     ) -> anyhow::Result<Self> {
-        let file_path = file_path.canonicalize()?;
-        let mut file = File::open(&file_path).with_context(|| {
-            anyhow!(
-                "Failed to open the file for reading, grabbing metadata and hashing the contents"
-            )
-        })?;
-        let mut data: Vec<u8> = Vec::new();
-        file.read_to_end(&mut data)
-            .with_context(|| anyhow!("Failed to read the entire file into a buffer"))?;
+        // Open the file so that a file that exists but cannot be read is rejected
+        // while adding it, instead of failing later during a sync
+        let file = File::open(file_path)
+            .with_context(|| format!("Failed to open {} for reading", file_path.display()))?;
+        let metadata = file.metadata()?;
+        let file_path = crate::util::absolute_path(file_path)?;
 
-        let mut map: HashMap<String, PathBuf> = HashMap::new();
-        map.insert(machine_id.clone(), file_path.clone());
+        let mut path_per_machine: HashMap<String, PathBuf> = HashMap::new();
+        path_per_machine.insert(machine_id.to_string(), file_path.clone());
 
         Ok(Self {
             id: None,
             name,
             file_path,
-            hash: XxHash3_64::oneshot(&data),
-            file_last_modified: file.metadata()?.modified()?.into(),
+            synced_hash: None,
+            file_last_modified: metadata.modified()?.into(),
             last_checked: None,
             updated_at: None,
             last_updated_from: None,
-            path_per_machine: map,
+            path_per_machine,
         })
     }
 }

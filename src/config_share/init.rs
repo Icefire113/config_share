@@ -3,7 +3,7 @@ use gethostname::gethostname;
 use lazy_static::lazy_static;
 use log::trace;
 use std::path::PathBuf;
-use url::{ParseError, Url};
+use url::Url;
 
 use crate::{config_share::ConfigShare, share_settings::ShareSettings, token_store};
 
@@ -19,11 +19,8 @@ lazy_static! {
 
 impl ConfigShare {
     /// Initialize config_share, creates the config file, and prompts the user to configure the app.
-    pub(crate) fn initialize(&mut self, overwrite: bool, skip_setup: bool) -> anyhow::Result<()> {
-        trace!(
-            "[init.initialize] overwrite={}, skip_setup={}",
-            overwrite, skip_setup
-        );
+    pub(crate) fn initialize(&mut self, overwrite: bool) -> anyhow::Result<()> {
+        trace!("[init.initialize] overwrite={}", overwrite);
 
         // Overwriting the config forgets the login, so remove the token that was stored
         // for the old config instead of leaving it behind in the keychain
@@ -36,9 +33,7 @@ impl ConfigShare {
         }
 
         self.create_config_file(overwrite)?;
-        if !skip_setup {
-            self.populate_config()?;
-        }
+        self.populate_config()?;
 
         if self.settings.auth.is_none() {
             println!("Run `config_share login` to authenticate with the server");
@@ -70,7 +65,6 @@ impl ConfigShare {
     }
 
     fn populate_config_server(&mut self) -> anyhow::Result<()> {
-        let server_url: Url;
         loop {
             let input = dialoguer::Input::<String>::new()
                 .allow_empty(false)
@@ -80,26 +74,29 @@ impl ConfigShare {
 
             trace!("[init.populate_config] input={}", input);
 
-            match Url::parse(&input) {
-                Ok(u) => {
-                    server_url = u;
-                    trace!("[init.populate_config] Setting server_url={}", server_url);
-                    break;
-                }
-                Err(ParseError::RelativeUrlWithoutBase) => {
-                    return Err(anyhow!(
-                        "Err: Server URL must have a base (e.g. http:// or https://)"
-                    ));
-                }
+            let url = match Url::parse(&input) {
+                Ok(url) => url,
                 Err(e) => {
-                    return Err(anyhow!("Err: {}", e));
+                    println!("That is not a valid URL ({}), try again", e);
+                    continue;
                 }
-            }
-        }
-        println!("Using server URL: {}", server_url);
-        self.settings.server_url = Some(server_url);
+            };
 
-        Ok(())
+            if url.scheme() != "http" && url.scheme() != "https" {
+                println!("The server URL must start with http:// or https://, try again");
+                continue;
+            }
+
+            if url.host_str().is_none() {
+                println!("The server URL needs a host, e.g. http://localhost:3000, try again");
+                continue;
+            }
+
+            trace!("[init.populate_config] Setting server_url={}", url);
+            println!("Using server URL: {}", url);
+            self.settings.server_url = Some(url);
+            return Ok(());
+        }
     }
 
     fn create_config_file(&mut self, overwrite: bool) -> anyhow::Result<()> {

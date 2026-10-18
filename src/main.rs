@@ -6,6 +6,7 @@ use std::result::Result::Ok;
 
 mod config_share;
 mod share_settings;
+mod sync_analysis;
 mod token_store;
 mod tracked_file_info;
 mod util;
@@ -22,10 +23,7 @@ fn main() -> anyhow::Result<()> {
         Some(("init", sub_matches)) => {
             trace!("[main.sub_command] init");
 
-            app.initialize(
-                sub_matches.get_flag("overwrite"),
-                sub_matches.get_flag("no-setup"),
-            )?;
+            app.initialize(sub_matches.get_flag("overwrite"))?;
         }
         Some(("add", sub_matches)) => {
             trace!("[main.sub_command] add");
@@ -37,7 +35,7 @@ fn main() -> anyhow::Result<()> {
                     // if this ever occurs, it's a bug as we set the argument to be required when creating the subcommand in clap
                     anyhow!("[main.sub_command] add: Failed to get the file option, this is a bug")
                 })?,
-                sub_matches.get_flag("ask-method"),
+                sub_matches.get_flag("use-path"),
             )?;
         }
         Some(("list", _)) => {
@@ -50,16 +48,26 @@ fn main() -> anyhow::Result<()> {
             trace!("[main.sub_command] remove");
             prepare_app(&mut app, true)?;
 
-            app.remove_file(sub_matches.get_one::<String>("file").with_context(|| {
-                // if this ever occurs, it's a bug as we set the argument to be required when creating the subcommand in clap
-                anyhow!("[main.sub_command] remove: Failed to get the file option, this is a bug")
-            })?)?;
+            app.remove_file(
+                sub_matches.get_one::<String>("file").with_context(|| {
+                    // if this ever occurs, it's a bug as we set the argument to be required when creating the subcommand in clap
+                    anyhow!(
+                        "[main.sub_command] remove: Failed to get the file option, this is a bug"
+                    )
+                })?,
+                sub_matches.get_flag("remote"),
+            )?;
         }
         Some(("sync", sub_matches)) => {
             trace!("[main.sub_command] sync");
             prepare_app(&mut app, true)?;
 
-            app.sync_files(sub_matches.get_one::<String>("file"))?;
+            app.sync_files(
+                sub_matches.get_one::<String>("file"),
+                sub_matches.get_flag("dry-run"),
+                sub_matches.get_flag("yes"),
+                sub_matches.get_flag("include-ignored"),
+            )?;
         }
         Some(("check", sub_matches)) => {
             trace!("[main.sub_command] check");
@@ -71,7 +79,10 @@ fn main() -> anyhow::Result<()> {
             trace!("[main.sub_command] status");
             prepare_app(&mut app, true)?;
 
-            app.status_files(sub_matches.get_one::<String>("file"))?;
+            app.status_files(
+                sub_matches.get_one::<String>("file"),
+                sub_matches.get_flag("include-ignored"),
+            )?;
         }
         Some(("pull", sub_matches)) => {
             trace!("[main.sub_command] pull");
@@ -97,11 +108,11 @@ fn main() -> anyhow::Result<()> {
 
             app.login(sub_matches.get_one::<String>("token").map(|t| t.as_str()))?;
         }
-        Some(("logout", _)) => {
+        Some(("logout", sub_matches)) => {
             trace!("[main.sub_command] logout");
             prepare_app(&mut app, false)?;
 
-            app.logout()?;
+            app.logout(sub_matches.get_flag("force"))?;
         }
         None => {
             // this is still an error, but we should also check if the user has
@@ -136,6 +147,7 @@ fn init_logger() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default_level))
         // keyring logs every keychain access at debug level, which is just noise
         .filter_module("keyring_core", log::LevelFilter::Info)
+        .filter_module("ureq", log::LevelFilter::Info)
         .init();
 }
 
@@ -154,12 +166,6 @@ fn cli() -> Command {
                         .action(ArgAction::SetTrue)
                         .help("Overwrites the config file with a new one with default values"),
                 )
-                .arg(
-                    Arg::new("no-setup")
-                        .long("no-setup")
-                        .action(ArgAction::SetTrue)
-                        .help("Skips the setup for the config, the config file will have default values"),
-                )
                 .about("Checks if config_share has been initialized and if not initializes it"),
         )
         // add subcommand
@@ -177,23 +183,41 @@ fn cli() -> Command {
             //     .action(ArgAction::SetTrue)
             //     .help("Skips syncing file permissions for this file")
             // )
-            .arg(Arg::new("ask-method")
-                .long("ask-method")
+            .arg(Arg::new("use-path")
+                .long("use-path")
                 .action(ArgAction::SetTrue)
-                .help("Prompts the user to select a method to name files (default is the local file name)")
+                .help("Uses the file path as the name without prompting for a naming method")
             )
             .about("Adds a file to the list of files that will be synced")
         )
         // sync subcommand
         .subcommand(
             Command::new("sync")
-            .about("Syncs all files with the server")
+            .about("Syncs the saved config files with the specified remote server")
             .arg(
                 Arg::new("file")
                 .required(false)
                 .help("Optional: The specific file to sync with the server")
             )
-            .about("Syncs the saved config files with the specified remote server")
+            .arg(
+                Arg::new("dry-run")
+                .long("dry-run")
+                .action(ArgAction::SetTrue)
+                .help("Shows what would be synced without changing anything")
+            )
+            .arg(
+                Arg::new("yes")
+                .long("yes")
+                .short('y')
+                .action(ArgAction::SetTrue)
+                .help("Applies safe changes without prompting and skips files that need a decision")
+            )
+            .arg(
+                Arg::new("include-ignored")
+                .long("include-ignored")
+                .action(ArgAction::SetTrue)
+                .help("Also offers server files that are currently ignored on this machine")
+            )
         )
         // list subcommand
         .subcommand(
@@ -208,6 +232,12 @@ fn cli() -> Command {
                 Arg::new("file")
                 .required(true)
                 .help("The file to remove")
+            )
+            .arg(
+                Arg::new("remote")
+                .long("remote")
+                .action(ArgAction::SetTrue)
+                .help("Also deletes the file from the server")
             )
         )
         // check subcommand
@@ -233,6 +263,12 @@ fn cli() -> Command {
                 Arg::new("file")
                     .required(false)
                     .help("The file to show the status of, if not specified all files currently tracked will be shown")
+            )
+            .arg(
+                Arg::new("include-ignored")
+                    .long("include-ignored")
+                    .action(ArgAction::SetTrue)
+                    .help("Also shows server files that are currently ignored on this machine")
             )
         )
         // pull subcommand
@@ -270,6 +306,12 @@ fn cli() -> Command {
         .subcommand(
             Command::new("logout")
             .about("Revokes the saved access token on the server and removes it locally")
+            .arg(
+                Arg::new("force")
+                    .long("force")
+                    .action(ArgAction::SetTrue)
+                    .help("Removes the token from this machine without revoking it on the server")
+            )
         )
         ;
     c.build();

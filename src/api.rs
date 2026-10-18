@@ -120,11 +120,18 @@ pub struct ApiClient {
 impl ApiClient {
     /// Creates a new client pointed at the given server url.
     pub fn new(base_url: Url) -> Self {
+        // Use the operating system's certificate store instead of ureq's bundled
+        // Mozilla roots, so that a self-signed root installed on the host is trusted.
+        let tls_config = ureq::tls::TlsConfig::builder()
+            .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+            .build();
+
         // Disable ureq's default behaviour of turning 4xx/5xx into errors so that
         // we can read and parse the `InternalErrorRes` body ourselves.
         let agent = ureq::Agent::new_with_config(
             ureq::Agent::config_builder()
                 .http_status_as_error(false)
+                .tls_config(tls_config)
                 .build(),
         );
 

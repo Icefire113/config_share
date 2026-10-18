@@ -2,6 +2,7 @@ use anyhow::{Context, anyhow};
 use std::{
     fs::{File, create_dir_all},
     io::{Read, Write},
+    path::Path,
 };
 use url::Url;
 
@@ -84,8 +85,33 @@ impl ConfigShare {
 
         let mut buff = String::new();
         file.read_to_string(&mut buff)?;
-        self.settings = serde_json::from_str(&buff)
+        let mut settings: ShareSettings = serde_json::from_str(&buff)
             .with_context(|| "Failed to parse the saved json settings into a struct of the current settings, is the saved settings from an older version?")?;
+
+        // Older versions stored Windows extended-length paths (`\\?\C:\...`) from
+        // canonicalization. Reduce them to plain absolute paths once so that they
+        // compare and display like the paths written by the current version.
+        settings.tracked_files = settings
+            .tracked_files
+            .into_iter()
+            .map(|(name, mut tracked)| {
+                let name = {
+                    let cleaned = dunce::simplified(Path::new(&name))
+                        .to_string_lossy()
+                        .to_string();
+                    if cleaned != name {
+                        tracked.name = cleaned.clone();
+                    }
+                    cleaned
+                };
+                tracked.file_path = dunce::simplified(&tracked.file_path).to_path_buf();
+                for path in tracked.path_per_machine.values_mut() {
+                    *path = dunce::simplified(path).to_path_buf();
+                }
+                (name, tracked)
+            })
+            .collect();
+        self.settings = settings;
 
         Ok(())
     }

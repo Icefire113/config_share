@@ -1,11 +1,24 @@
 # Adding a File
 
-Adding a file can by done simply by running
-`config_share add_file <file_path>`. Which will default to telling which
-file is which simply by the path of the file, however this may not
-be your desired behaviour, so you can also pick a different method by
-running `config_share add_file <file_path> --ask-method` which will prompt
-you to select a method (either by a custom name or by the file path)
+Add a file to the tracked set with:
 
-If the method that you select is by a custom name, then you will also have
-to specify the full path to which the file is to be stored
+```sh
+config_share add <file_path>
+```
+
+By default this prompts for how the file should be named on the server:
+
+- **File Path** — use the absolute local path as the name.
+- **Custom Name** — enter a name, defaulting to the absolute path.
+
+For scripts or non-interactive use, skip the prompt with:
+
+```sh
+config_share add --use-path <file_path>
+```
+
+The path is resolved to an absolute path (`~` is expanded), and adding the same
+path twice is an error.
+
+The file is not uploaded until you run `config_share sync` (or `config_share
+push`).

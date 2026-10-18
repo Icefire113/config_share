@@ -1,90 +1,111 @@
 use std::path::Path;
 
-use anyhow::{Context, anyhow};
+use anyhow::{Context, bail};
+use console::style;
 use log::trace;
 
-use crate::{
-    config_share::ConfigShare,
-    tracked_file_info::TrackedFile,
-    util::{display_option, get_path_as_string},
-};
+use crate::{config_share::ConfigShare, sync_analysis, util::paths_equal};
 
 impl ConfigShare {
+    /// Checks the local files against the state saved in the config, without talking
+    /// to the server. This answers "has anything changed locally since the last sync".
     pub fn check_files(&self, file: Option<&String>) -> anyhow::Result<()> {
-        trace!(
-            "[config_share.check_files] Checking file {}",
-            display_option(file)
-        );
+        trace!("[config_share.check_files] Checking file {:?}", file);
 
-        match file {
-            Some(file) => {
-                let file = Path::new(file);
+        let names: Vec<String> = match file {
+            Some(path) => {
+                let requested = crate::util::absolute_path(Path::new(path))?;
 
-                if !file.try_exists()? || !file.is_file() {
-                    return Err(anyhow!(
-                        "[config_share.check_files] File does not exist or is not a file"
-                    ));
+                let names: Vec<String> = self
+                    .settings
+                    .tracked_files
+                    .iter()
+                    .filter(|(_, tracked)| paths_equal(&tracked.file_path, &requested))
+                    .map(|(name, _)| name.clone())
+                    .collect();
+
+                if names.is_empty() {
+                    bail!("The file {} is not currently tracked", requested.display());
                 }
 
-                // If the file is not tracked then cant check it
-                if !self.settings.tracked_files.iter().any(|tracked_file| {
-                    tracked_file
-                        .1
-                        .path_per_machine
-                        .get(&self.settings.machine_id)
-                        .unwrap()
-                        == file.canonicalize().unwrap().as_path()
-                }) {
-                    return Err(anyhow!(
-                        "The file {} is not currently tracked",
-                        get_path_as_string(file)?
-                    ));
-                }
+                names
+            }
+            None => self.settings.tracked_files.keys().cloned().collect(),
+        };
 
-                return self.check_single_file(
-                    self.settings
-                        .get_tracked_file_from_path(&file.canonicalize()?)?,
-                    false,
+        if names.is_empty() {
+            println!("{}", style("No files are currently tracked.").yellow());
+            return Ok(());
+        }
+
+        let mut up_to_date = 0;
+        let mut modified = 0;
+        let mut not_synced = 0;
+        let mut no_anchor = 0;
+        let mut missing = 0;
+
+        for name in names {
+            let tracked = self
+                .settings
+                .tracked_files
+                .get(&name)
+                .with_context(|| format!("Tracked file {} not found", name))?;
+            let local = sync_analysis::scan_local_file(&tracked.file_path)?;
+
+            let (label, color) = match (
+                tracked.id,
+                tracked.synced_hash,
+                local.as_ref().map(|l| l.hash),
+            ) {
+                (None, _, Some(_)) => {
+                    not_synced += 1;
+                    ("not synced yet", console::Color::Yellow)
+                }
+                (None, _, None) => {
+                    missing += 1;
+                    ("never synced, missing locally", console::Color::Red)
+                }
+                (Some(_), None, Some(_)) => {
+                    no_anchor += 1;
+                    ("no sync anchor", console::Color::Yellow)
+                }
+                (Some(_), _, None) => {
+                    missing += 1;
+                    ("missing locally", console::Color::Red)
+                }
+                (Some(_), Some(anchor), Some(hash)) if anchor == hash => {
+                    up_to_date += 1;
+                    ("up to date locally", console::Color::Green)
+                }
+                (Some(_), Some(_), Some(_)) => {
+                    modified += 1;
+                    ("modified locally", console::Color::Red)
+                }
+            };
+
+            let path = tracked.file_path.display().to_string();
+            if name == path {
+                println!("{} {}", style(format!("{:<30}", label)).fg(color), name);
+            } else {
+                println!(
+                    "{} {} ({})",
+                    style(format!("{:<30}", label)).fg(color),
+                    name,
+                    path
                 );
             }
-            None => {
-                // no file specified check all of them
-                for (name, tracked_file) in self.settings.tracked_files.iter() {
-                    self.check_single_file(tracked_file, true)
-                        .with_context(|| {
-                            anyhow!(
-                                "[config_share.checkfiles] Failed to check single file: {}",
-                                name
-                            )
-                        })?;
-                }
+        }
 
-                return Ok(());
-            }
-        };
-    }
+        println!();
+        println!(
+            "{} up to date, {} modified locally, {} not synced, {} without a sync anchor, {} missing locally",
+            up_to_date, modified, not_synced, no_anchor, missing
+        );
 
-    fn check_single_file(&self, file: &TrackedFile, batch: bool) -> anyhow::Result<()> {
-        todo!();
-        // let r = is_remote_hash_same(file, &self.settings).with_context(|| {
-        //     anyhow!(
-        //         "[config_share.checkfiles] Failed to check single file: {}",
-        //         file.file_path.display().to_string()
-        //     )
-        // })?;
+        if modified > 0 || not_synced > 0 || no_anchor > 0 || missing > 0 {
+            println!("Run `config_share sync` to reconcile these files with the server.");
+        }
 
-        // if !r {
-        //     println!(
-        //         "[config_share.checkfiles] File {} is out of date",
-        //         file.file_path.display().to_string()
-        //     );
-        // } else if !batch {
-        //     println!(
-        //         "[config_share.checkfiles] File {} is up to date",
-        //         file.file_path.display().to_string()
-        //     );
-        // }
-
-        // Ok(())
+        Ok(())
     }
 }

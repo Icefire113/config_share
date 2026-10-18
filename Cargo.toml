@@ -13,6 +13,7 @@ chrono = { version = "0.4.44", features = ["serde"] }
 clap = { version = "4.6.7", features = ["cargo"] }
 console = { version = "0.16.6", features = ["windows-console-colors"] }
 dialoguer = { version = "0.12.0", features = ["history"] }
+dunce = "1.0.5"
 env_logger = "0.11.11"
 gethostname = "1.1.0"
 keyring = "4.2.0"
@@ -20,9 +21,10 @@ lazy_static = "1.5.1"
 log = "0.4.33"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.154" }
+similar = "3.2.0"
 tabled = "0.22.0"
 thiserror = "2.0.21"
 twox-hash = "2.1.5"
-ureq = { version = "3.4.2", features = ["json"] }
+ureq = { version = "3.4.2", features = ["json", "platform-verifier"] }
 url = { version = "2.5.8", features = ["serde"] }
 uuid = { version = "1.28.0", features = ["serde", "v4", "fast-rng"] }

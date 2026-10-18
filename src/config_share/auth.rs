@@ -13,6 +13,7 @@ use crate::{
     config_share::ConfigShare,
     share_settings::AuthInfo,
     token_store,
+    util::format_local_time,
 };
 
 impl ConfigShare {
@@ -73,7 +74,7 @@ impl ConfigShare {
             style("Logged in with").green().bold(),
             style(token_name).bold(),
             expires_at
-                .map(|expires_at| expires_at.to_rfc2822())
+                .map(format_local_time)
                 .unwrap_or_else(|| "never".to_string()),
         );
 
@@ -81,10 +82,35 @@ impl ConfigShare {
     }
 
     /// Revokes the saved access token on the server and removes it from the OS keychain.
-    pub fn logout(&mut self) -> anyhow::Result<()> {
-        trace!("[auth.logout] Logging out");
+    ///
+    /// With `force`, only removes the token from this machine and leaves it valid on
+    /// the server, which is useful when the server cannot be reached or the token is
+    /// managed elsewhere.
+    pub fn logout(&mut self, force: bool) -> anyhow::Result<()> {
+        trace!("[auth.logout] Logging out, force={}", force);
 
         let server_url = self.server_url()?;
+
+        if force {
+            let removed = token_store::load_token(&server_url)?.is_some();
+            let had_login = self.settings.auth.is_some() || removed;
+
+            token_store::delete_token(&server_url)?;
+            self.settings.auth = None;
+            self.save_settings()?;
+
+            if had_login {
+                println!(
+                    "{}",
+                    style("Removed the token from this machine, it is still valid on the server.")
+                        .yellow()
+                );
+            } else {
+                println!("{}", style("Not logged in.").yellow());
+            }
+
+            return Ok(());
+        }
 
         let Some(auth) = self.settings.auth.clone() else {
             // There is no login metadata, but a token may still be left in the keychain
@@ -182,7 +208,7 @@ impl ConfigShare {
         if info.expires_at <= Utc::now() {
             bail!(
                 "The provided access token expired on {}",
-                info.expires_at.to_rfc2822()
+                format_local_time(info.expires_at)
             );
         }
 

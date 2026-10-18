@@ -3,38 +3,42 @@ use chrono::{TimeDelta, Utc};
 use console::style;
 use log::trace;
 
-use crate::config_share::{ConfigShare, init};
+use crate::{
+    config_share::{ConfigShare, init},
+    util::format_local_time,
+};
 
 impl ConfigShare {
     /// Startup checks for the app after all settings are loaded
     pub fn all_startup_checks(&self) -> anyhow::Result<()> {
-        // self.check_last_manual_sync()?;
+        self.check_last_manual_sync()?;
         self.check_machine_id_blank()?;
         self.check_logged_in()?;
         self.check_unsynced_files()?;
         Ok(())
     }
 
+    /// Warns when it has been a while since the user last synced.
     pub fn check_last_manual_sync(&self) -> anyhow::Result<()> {
         trace!("[startup_checks.check_last_manual_sync] Checking last manual sync.");
 
-        if self.settings.last_sync.is_none() {
-            return self.sync_files(None);
-        }
+        let Some(last_sync) = self.settings.last_sync else {
+            return Ok(());
+        };
 
-        let time_since_last_sync = Utc::now()
+        let cutoff = Utc::now()
             .checked_sub_signed(TimeDelta::hours(self.settings.manual_sync_reminder_time))
             .with_context(||
-                anyhow!("[startup_checks.check_last_manual_sync] Failed to subtract {} hours from the current date", 
+                anyhow!("[startup_checks.check_last_manual_sync] Failed to subtract {} hours from the current date",
                 self.settings.manual_sync_reminder_time)
             )?;
 
-        // if the last sync time is older than current time - sync reminder time inform user
-        if self.settings.last_sync.unwrap() < time_since_last_sync {
+        if last_sync < cutoff {
             println!(
-                "{}: It's been {} hours since your last manual sync, please sync with the server, or change reminder time in the config",
+                "{}: It's been {} days since your last sync ({}). Run `config_share sync` to catch up, or change `manual_sync_reminder_time` in the config",
                 style("warning").yellow().bold(),
-                time_since_last_sync
+                (Utc::now() - last_sync).num_days(),
+                format_local_time(last_sync),
             );
         }
 
@@ -69,7 +73,7 @@ impl ConfigShare {
                     println!(
                         "{}: Your access token expired on {}, run `config_share logout` and then `config_share login` to get a new one",
                         style("warning").yellow().bold(),
-                        expires_at.to_rfc2822()
+                        format_local_time(expires_at)
                     );
                 }
             }

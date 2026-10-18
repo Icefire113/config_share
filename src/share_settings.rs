@@ -1,9 +1,9 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::{HashMap, HashSet};
 
-use anyhow::{Context, anyhow};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use url::Url;
+use uuid::Uuid;
 
 use crate::tracked_file_info::TrackedFile;
 
@@ -25,6 +25,9 @@ pub(crate) struct ShareSettings {
     /// Defaulted so that configs created before login existed still load.
     #[serde(default)]
     pub(crate) auth: Option<AuthInfo>,
+    /// Remote files that the user chose not to track on this machine
+    #[serde(default)]
+    pub(crate) ignored_remote_files: HashSet<Uuid>,
 }
 
 /// Non-secret metadata about the access token stored in the OS keychain.
@@ -49,20 +52,7 @@ impl Default for ShareSettings {
             manual_sync_reminder_time: 24 * 7, // 24hrs * 7 = 1 week
             machine_id: "".to_string(),
             auth: None,
+            ignored_remote_files: HashSet::new(),
         }
-    }
-}
-
-impl ShareSettings {
-    pub fn get_tracked_file_from_path(&self, file: &PathBuf) -> anyhow::Result<&TrackedFile> {
-        self.tracked_files
-            .iter()
-            .find_map(|(_, v)| if v.file_path == *file { Some(v) } else { None })
-            .with_context(|| {
-                anyhow!(
-                    "[share_settings.get_tracked_file_from_path] File for given path {} not found",
-                    file.display()
-                )
-            })
     }
 }

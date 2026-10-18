@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use crate::config_share::ConfigShare;
+use crate::util::format_local_time;
 use console::style;
 use tabled::{Table, Tabled};
 
@@ -23,7 +24,7 @@ impl ConfigShare {
 
         let table = Table::new(self.settings.tracked_files.iter().map(|file| Record {
             path: file.1.file_path.to_string_lossy(),
-            last_modified: file.1.file_last_modified.to_rfc2822(),
+            last_modified: format_local_time(file.1.file_last_modified),
             name: &file.1.name,
         }));
         println!("{}", table);
