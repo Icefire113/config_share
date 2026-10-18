@@ -1,6 +1,6 @@
 use anyhow::{Context, anyhow};
 use std::{
-    fs::File,
+    fs::{File, create_dir_all},
     io::{Read, Write},
 };
 use url::Url;
@@ -92,6 +92,8 @@ impl ConfigShare {
 
     /// Saves the settings in `self.settings` to the config file
     pub fn save_settings(&self) -> anyhow::Result<()> {
+        create_dir_all(init::CONFIG_FILE_PATH.as_path().parent().unwrap())
+            .with_context(|| "Failed to create parent dir(s) for config file")?;
         let mut file = File::options()
             .write(true)
             .create(true)
