@@ -40,7 +40,8 @@ impl TrackedFile {
         machine_id: &String,
         name: String,
     ) -> anyhow::Result<Self> {
-        let mut file = File::open(file_path).with_context(|| {
+        let file_path = file_path.canonicalize()?;
+        let mut file = File::open(&file_path).with_context(|| {
             anyhow!(
                 "Failed to open the file for reading, grabbing metadata and hashing the contents"
             )
@@ -50,12 +51,12 @@ impl TrackedFile {
             .with_context(|| anyhow!("Failed to read the entire file into a buffer"))?;
 
         let mut map: HashMap<String, PathBuf> = HashMap::new();
-        map.insert(machine_id.clone(), file_path.canonicalize()?.to_path_buf());
+        map.insert(machine_id.clone(), file_path.clone());
 
         Ok(Self {
             id: None,
             name,
-            file_path: file_path.canonicalize()?.to_path_buf(),
+            file_path,
             hash: XxHash3_64::oneshot(&data),
             file_last_modified: file.metadata()?.modified()?.into(),
             last_checked: None,
