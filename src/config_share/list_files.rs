@@ -1,6 +1,8 @@
+use std::borrow::Cow;
+
 use crate::config_share::ConfigShare;
-use anyhow::Ok;
 use console::style;
+use tabled::{Table, Tabled};
 
 impl ConfigShare {
     pub fn list_files(&self) -> anyhow::Result<()> {
@@ -9,22 +11,19 @@ impl ConfigShare {
             return Ok(());
         }
 
-        println!(
-            "{: <40} | {: <30} | {: <20}",
-            style("File Path").bold(),
-            style("Last Modified").bold(),
-            style("Name").bold(),
-        );
-        println!("{}", style("-".repeat(100)));
-
-        for file_info in self.settings.tracked_files.iter() {
-            println!(
-                "{: <40} | {: <20} | {: <30}",
-                file_info.1.file_path.to_string_lossy(),
-                file_info.1.file_last_modified.to_rfc2822(),
-                file_info.1.name,
-            );
+        #[derive(Tabled)]
+        struct Record<'a> {
+            path: Cow<'a, str>,
+            last_modified: String,
+            name: &'a str,
         }
+
+        let table = Table::new(self.settings.tracked_files.iter().map(|file| Record {
+            path: file.1.file_path.to_string_lossy(),
+            last_modified: file.1.file_last_modified.to_rfc2822(),
+            name: &file.1.name,
+        }));
+        println!("{}", table);
 
         Ok(())
     }
