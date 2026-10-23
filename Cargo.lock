@@ -106,7 +106,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 [[package]]
 name = "api-types"
 version = "0.2.0"
-source = "git+https://github.com/Icefire113/sync_server.git#0fd4c9d8f0b3fdc1a60bc498e39a3839c6b0fbfc"
+source = "git+https://github.com/Icefire113/sync_server.git#66604a9be380e9784719e093fcfe9a24ec025556"
 dependencies = [
  "chrono",
  "http",
@@ -512,7 +512,7 @@ dependencies = [
 
 [[package]]
 name = "config_share"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "api-types",
