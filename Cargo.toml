@@ -29,7 +29,7 @@ similar = "3.2.0"
 tabled = "0.22.0"
 thiserror = "2.0.21"
 twox-hash = "2.1.5"
-ureq = { version = "3.4.2", features = ["json", "platform-verifier"] }
+ureq = { version = "3.5.0", features = ["json", "platform-verifier"] }
 url = { version = "2.5.8", features = ["serde"] }
 uuid = { version = "1.28.0", features = ["serde", "v4", "fast-rng"] }
 zeroize = "1.9.1"
