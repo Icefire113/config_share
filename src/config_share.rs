@@ -21,7 +21,7 @@ mod add_file;
 mod auth;
 mod check_files;
 pub(crate) mod encryption;
-mod init;
+pub(crate) mod init;
 mod list_files;
 mod ping;
 mod pull;

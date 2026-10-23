@@ -20,9 +20,17 @@ fn main() -> anyhow::Result<()> {
     init_logger();
 
     let mut app = ConfigShare::default();
-    let mut matches = cli();
+    let mut command = cli();
+    let matches = command.get_matches_mut();
 
-    match matches.get_matches_mut().subcommand() {
+    // Must happen before any secret is read or written
+    secret_store::configure(
+        matches
+            .get_one::<String>("secret-store")
+            .map(String::as_str),
+    )?;
+
+    match matches.subcommand() {
         Some(("init", sub_matches)) => {
             trace!("[main.sub_command] init");
 
@@ -137,7 +145,7 @@ fn main() -> anyhow::Result<()> {
         None => {
             // this is still an error, but we should also check if the user has
             // initialized the config aswell as show the usage/ help options
-            matches.print_long_help()?;
+            command.print_long_help()?;
             app.check_is_config_setup()?;
             // return Err("".into());
         }
@@ -175,6 +183,20 @@ fn init_logger() {
 fn cli() -> Command {
     let mut c = command!()
         .about("Utility for syncing config files across multiple machines")
+        // Global option, read before the subcommand is dispatched
+        .arg(
+            Arg::new("secret-store")
+                .long("secret-store")
+                .global(true)
+                .value_name("STORE")
+                .value_parser(["auto", "keyring", "file"])
+                .help(
+                    "Where to keep the access token and encryption passphrase: `auto` tries the \
+                     OS keychain and falls back to a 0600 file when it is unusable, `keyring` \
+                     requires the OS keychain, `file` needs no keychain at all (default: auto, \
+                     or CONFIG_SHARE_SECRET_STORE)",
+                ),
+        )
         // We dont use this as we check this ourselves because we want to check if the config has already
         // been populated
         // .arg_required_else_help(true)

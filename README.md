@@ -28,8 +28,10 @@ automatic where it is safe.
   account on it. TLS verification uses the host's certificate store
   (`rustls-platform-verifier`), so a self-signed root installed in the OS trust
   store is accepted.
-- An OS keychain. On headless Linux you need a Secret Service provider such as
-  GNOME Keyring or KWallet.
+- Somewhere to keep the access token and encryption passphrase: the OS keychain
+  (Windows Credential Manager, macOS Keychain, or Secret Service on Linux), or a
+  local `0600` file when there is no keychain, such as on a headless Linux box.
+  See [Secret storage](#secret-storage).
 
 ## Install
 
@@ -172,6 +174,42 @@ have no header and are rejected on download. Re-upload them with
 - Server file names are not unique, which is why everything is keyed by id and
   "link to an existing file" is an explicit choice rather than a name match.
 
+## Secret storage
+
+The access token and the encryption passphrase never go into the config file.
+They are kept in the OS keychain (Windows Credential Manager, macOS Keychain, or
+Secret Service on Linux) under the service `config_share` and the account
+`<host>:<port>`, with `:encryption` appended for the passphrase.
+
+`--secret-store <STORE>` (or the `CONFIG_SHARE_SECRET_STORE` environment variable,
+useful for cron and systemd units) picks the backend:
+
+| Value            | Behaviour                                                                                       |
+| ---------------- | ----------------------------------------------------------------------------------------------- |
+| `auto` (default) | Use the OS keychain. If it is unusable, warn and use the secrets file for the rest of the run.  |
+| `keyring`        | Require the OS keychain and fail otherwise, so a keychain problem is never silently downgraded. |
+| `file`           | Never touch the keychain; keep secrets in `~/.config/config_share/secrets.json`.                |
+
+"Unusable" means there is no D-Bus session, no Secret Service provider, no default
+collection, or the collection cannot be unlocked (a headless linux box). `auto`
+prints a warning each run when it falls back, so the downgrade is never silent;
+pass `--secret-store keyring` to turn that into an error instead.
+
+The secrets file is plaintext JSON with `0600` permissions inside a `0700`
+directory. Prefer a real keychain when one is available.
+
+### Headless Linux
+
+Without a desktop session there is usually no Secret Service, and the keychain
+reports errors such as `No default store has been set` or `No access to platform
+storage`. Either skip the keychain:
+
+```sh
+config_share --secret-store file login
+# or, for cron/systemd units that cannot pass flags:
+export CONFIG_SHARE_SECRET_STORE=file
+```
+
 ## Config file
 
 ```json
@@ -208,6 +246,8 @@ have no header and are rejected on download. Re-upload them with
 The token itself is **not** in this file; `auth` only keeps the metadata needed to
 revoke it. The encryption passphrase is not in this file either: `encryption`
 only stores the non-secret Argon2 salt used for files uploaded from this machine.
+Both live in the secret store described above, which is
+`~/.config/config_share/secrets.json` when `--secret-store file` is used.
 `manual_sync_reminder_time` is in hours and controls the "it has been a while"
 warning shown by most commands.
 
@@ -224,6 +264,8 @@ warning shown by most commands.
   resolve those with `sync` instead.
 - `pull` only pulls files already tracked on this machine. It warns about server
   files that are not tracked here and points at `sync`.
+- The file secret store keeps the token and passphrase in plaintext (mode `0600`);
+  use a keychain where one is available.
 - The config path is fixed; there is no `--config` override yet.
 - Ignored files can be viewed again with `--include-ignored`, but there is no
   dedicated command to list or bulk-unignore them.
