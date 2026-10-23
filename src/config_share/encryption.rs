@@ -197,7 +197,7 @@ impl ConfigShare {
                 }
 
                 let save = Confirm::new()
-                    .with_prompt("Save the passphrase in the OS keychain?")
+                    .with_prompt("Save the passphrase for future runs?")
                     .default(true)
                     .interact()?;
                 if save {

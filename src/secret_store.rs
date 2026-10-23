@@ -158,14 +158,18 @@ fn warn_fallback(err: &KeyringError) {
     }
 }
 
-/// Runs an operation against the selected backend.
+/// Runs a load or save against the selected backend.
 ///
-/// In [`Preference::Auto`] mode the keychain is tried first and the secrets file
-/// is used when the keychain turns out to be unusable.
+/// `None` from the keychain means it has no value for the account. That is not
+/// the same as "nothing is stored": a keychain can be readable but unable to
+/// create entries (for example when it has no default collection), in which case
+/// a value saved after an earlier fallback lives in the secrets file while the
+/// keychain keeps reporting that it has no entry. So in [`Preference::Auto`] mode
+/// the file is consulted on a keychain miss as well.
 fn run<T>(
-    keychain: impl FnOnce() -> Result<T, KeyringError>,
-    file: impl FnOnce() -> anyhow::Result<T>,
-) -> anyhow::Result<T> {
+    keychain: impl FnOnce() -> Result<Option<T>, KeyringError>,
+    file: impl FnOnce() -> anyhow::Result<Option<T>>,
+) -> anyhow::Result<Option<T>> {
     match preference() {
         Preference::File => {
             set_backend(Backend::File);
@@ -180,10 +184,20 @@ fn run<T>(
             }
 
             match keychain() {
-                Ok(value) => {
+                Ok(Some(value)) => {
                     set_backend(Backend::Keychain);
-                    Ok(value)
+                    Ok(Some(value))
                 }
+                Ok(None) => match file()? {
+                    Some(value) => {
+                        debug!(
+                            "[secret_store.run] The OS keychain has no entry, using the secrets file"
+                        );
+                        set_backend(Backend::File);
+                        Ok(Some(value))
+                    }
+                    None => Ok(None),
+                },
                 Err(e) if is_unusable(&e) => {
                     warn_fallback(&e);
                     set_backend(Backend::File);
@@ -231,11 +245,28 @@ fn account(server_url: &Url, purpose: &str) -> String {
 /// Saves a value for the given server and purpose.
 fn save(server_url: &Url, purpose: &str, value: &str) -> anyhow::Result<()> {
     let account = account(server_url, purpose);
-    run(
-        || keychain_save(&account, value),
-        || file_save(&account, value),
-    )
-    .with_context(|| describe("save", &account))
+
+    let result = run(
+        || keychain_save(&account, value).map(Some),
+        || file_save(&account, value).map(Some),
+    );
+
+    // When the keychain took the value, drop a copy an earlier fallback left
+    // behind so the two backends cannot disagree about it. Failing to clean up
+    // is not worth failing the save over.
+    if result.is_ok()
+        && backend() == Some(Backend::Keychain)
+        && let Err(e) = file_delete(&account)
+    {
+        debug!(
+            "[secret_store.save] Could not remove a stale copy from the secrets file: {:#}",
+            e
+        );
+    }
+
+    result
+        .map(|_| ())
+        .with_context(|| describe("save", &account))
 }
 
 /// Loads a value for the given server and purpose, if there is one.
@@ -247,11 +278,43 @@ fn load(server_url: &Url, purpose: &str) -> anyhow::Result<Option<String>> {
 
 /// Deletes a value for the given server and purpose.
 ///
-/// Deleting a value that is not there is not an error.
+/// Deleting a value that is not there is not an error. In [`Preference::Auto`]
+/// mode both backends are cleared, so a logout never leaves a copy behind.
 fn delete(server_url: &Url, purpose: &str) -> anyhow::Result<()> {
     let account = account(server_url, purpose);
-    run(|| keychain_delete(&account), || file_delete(&account))
-        .with_context(|| describe("delete", &account))
+
+    match preference() {
+        Preference::File => {
+            set_backend(Backend::File);
+            file_delete(&account).with_context(|| describe("delete", &account))
+        }
+        Preference::Keyring => {
+            keychain_delete(&account)
+                .map_err(keychain_error)
+                .with_context(|| describe("delete", &account))?;
+            set_backend(Backend::Keychain);
+            Ok(())
+        }
+        Preference::Auto => {
+            if backend() != Some(Backend::File) {
+                match keychain_delete(&account) {
+                    Ok(()) => set_backend(Backend::Keychain),
+                    Err(e) if is_unusable(&e) => {
+                        warn_fallback(&e);
+                        set_backend(Backend::File);
+                    }
+                    Err(e) => {
+                        return Err(keychain_error(e))
+                            .with_context(|| describe("delete", &account));
+                    }
+                }
+            }
+
+            // Errors from the file already name it, so they are not wrapped with
+            // a message about the keychain
+            file_delete(&account)
+        }
+    }
 }
 
 /// Saves the access token for the given server.
@@ -538,38 +601,63 @@ mod tests {
     // The backend selection is process-wide, so this test is the only one that
     // touches it and restores the defaults at the end.
     #[test]
-    fn auto_falls_back_to_the_file_once_the_keychain_is_unusable() {
+    fn auto_mode_picks_a_usable_backend() {
         set_preference(Preference::Auto);
 
+        // The keychain is unusable: the file takes over
         let unusable = || {
-            Err::<&str, KeyringError>(KeyringError::NoStorageAccess(
+            Err::<Option<&str>, KeyringError>(KeyringError::NoStorageAccess(
                 "no default collection".into(),
             ))
         };
-        let value = run(unusable, || Ok("from the file")).unwrap();
-        assert_eq!(value, "from the file");
+        let value = run(unusable, || Ok(Some("from the file"))).unwrap();
+        assert_eq!(value, Some("from the file"));
 
         // The rest of the run stays on the file instead of retrying the keychain
         let value = run(
             || panic!("the keychain must not be retried after falling back"),
-            || Ok("from the file"),
+            || Ok(Some("from the file")),
         )
         .unwrap();
-        assert_eq!(value, "from the file");
+        assert_eq!(value, Some("from the file"));
+
+        // A keychain that has no entry is not proof that nothing is stored: a value
+        // saved after an earlier fallback is in the file
+        set_backend(Backend::Keychain);
+        let value = run(
+            || Ok::<Option<&str>, KeyringError>(None),
+            || Ok(Some("from the file")),
+        )
+        .unwrap();
+        assert_eq!(value, Some("from the file"));
+
+        // A keychain value wins over a leftover file copy
+        set_backend(Backend::Keychain);
+        let value = run(
+            || Ok::<Option<&str>, KeyringError>(Some("from the keychain")),
+            || panic!("the file must not be read when the keychain has the value"),
+        )
+        .unwrap();
+        assert_eq!(value, Some("from the keychain"));
+
+        // Neither backend has the value
+        set_backend(Backend::Keychain);
+        let value = run(|| Ok::<Option<&str>, KeyringError>(None), || Ok(None)).unwrap();
+        assert_eq!(value, None);
 
         // An explicit choice never falls back
         set_preference(Preference::File);
         set_backend(Backend::Keychain);
         let value = run(
             || panic!("the keychain must not be used with `--secret-store file`"),
-            || Ok("from the file"),
+            || Ok(Some("from the file")),
         )
         .unwrap();
-        assert_eq!(value, "from the file");
+        assert_eq!(value, Some("from the file"));
 
         set_preference(Preference::Keyring);
         let result = run(
-            || Err::<&str, KeyringError>(KeyringError::NoDefaultStore),
+            || Err::<Option<&str>, KeyringError>(KeyringError::NoDefaultStore),
             || panic!("the file must not be used with `--secret-store keyring`"),
         );
         assert!(result.is_err());

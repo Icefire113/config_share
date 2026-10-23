@@ -118,7 +118,7 @@ impl ConfigShare {
                 secret_store::delete_token(&server_url)?;
                 println!(
                     "{}",
-                    style("Removed a leftover token from the OS keychain.").green()
+                    style("Removed a leftover token from the secret store.").green()
                 );
             } else {
                 println!("{}", style("Not logged in.").yellow());
@@ -174,10 +174,7 @@ impl ConfigShare {
             None => {
                 println!(
                     "{}",
-                    style(
-                        "No access token found in the OS keychain, removing the local login only."
-                    )
-                    .yellow()
+                    style("No access token found, removing the local login only.").yellow()
                 );
             }
         }

@@ -77,7 +77,7 @@ impl ConfigShare {
     }
 
     /// Creates an API client for the configured server, authenticated with the token
-    /// stored in the OS keychain if the user has logged in.
+    /// from the secret store if the user has logged in.
     pub fn get_api_client(&self) -> anyhow::Result<ApiClient> {
         let server_url = self.server_url()?;
         let client = ApiClient::new(server_url.clone());
@@ -86,7 +86,7 @@ impl ConfigShare {
             Some(_) => {
                 let token = secret_store::load_token(&server_url)?.with_context(|| {
                     anyhow!(
-                        "No access token found in the OS keychain for {}, run `config_share login` again",
+                        "No access token found for {}, run `config_share login` again",
                         server_url
                     )
                 })?;
